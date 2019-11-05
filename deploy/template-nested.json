@@ -30,7 +30,7 @@
         {
             "name": "[concat('stampTemplate-', parameters('stamps')[copyIndex('stampsCopy')].regionId)]",
             "type": "Microsoft.Resources/deployments",
-            "apiVersion": "2018-05-01",
+            "apiVersion": "2019-05-01",
             "copy": {
                 "name": "stampsCopy",
                 "count": "[length(parameters('stamps'))]"
@@ -100,7 +100,7 @@
                         {
                             "name": "[concat(variables('ingestionCdnProfileNamePrefix'), parameters('stamps')[copyIndex('stampsCopy')].suffix, '/', variables('ingestionCdnEndpointNamePrefix'), parameters('stamps')[copyIndex('stampsCopy')].suffix)]",
                             "type": "Microsoft.Cdn/profiles/endpoints",
-                            "apiVersion": "2016-04-02",
+                            "apiVersion": "2019-04-15",
                             "location": "[parameters('stamps')[copyIndex('stampsCopy')].regionId]",
                             "properties": {
                                 "originHostHeader": "[reference(concat(variables('ingestionStorageAccountNamePrefix'), parameters('stamps')[copyIndex()].suffix)).primaryEndpoints.blob]",
