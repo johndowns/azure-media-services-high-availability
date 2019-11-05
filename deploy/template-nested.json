@@ -1,0 +1,128 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "stamps": {
+            "type": "array",
+            "defaultValue": [
+                {
+                    "regionId": "eastus2",
+                    "suffix": "eus2"
+                }
+            ]
+        },
+        "resourceNamePrefix": {
+            "type": "string",
+            "defaultValue": "[uniqueString(subscription().subscriptionId, resourceGroup().name)]"
+        }
+    },
+    "variables": {
+        "ingestionStorageAccountNamePrefix": "[concat(parameters('resourceNamePrefix'), 'ingst')]",
+        "ingestionCdnProfileNamePrefix": "[concat(parameters('resourceNamePrefix'), 'ingcdnprofile')]",
+        "ingestionCdnEndpointNamePrefix": "[concat(parameters('resourceNamePrefix'), 'ingcdn')]",
+        "appServicePlanNamePrefix": "[concat(parameters('resourceNamePrefix'), 'asp')]",
+        "functionStorageAccountNamePrefix": "[concat(parameters('resourceNamePrefix'), 'fnst')]",
+        "functionAppNamePrefix": "[concat(parameters('resourceNamePrefix'), 'fn')]",
+        "mediaEncodingStorageAccountNamePrefix": "[concat(parameters('resourceNamePrefix'), 'amsst')]",
+        "mediaServicesNamePrefix": "[concat(parameters('resourceNamePrefix'), 'ams')]"
+    },
+    "resources": [
+        {
+            "name": "[concat('stampTemplate-', parameters('stamps')[copyIndex('stampsCopy')].regionId)]",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2018-05-01",
+            "copy": {
+                "name": "stampsCopy",
+                "count": "[length(parameters('stamps'))]"
+            },
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": [
+                        {
+                            "name": "[concat(variables('ingestionStorageAccountNamePrefix'), parameters('stamps')[copyIndex('stampsCopy')].suffix)]",
+                            "type": "Microsoft.Storage/storageAccounts",
+                            "apiVersion": "2016-01-01",
+                            "location": "[parameters('stamps')[copyIndex('stampsCopy')].regionId]",
+                            "kind": "Storage",
+                            "sku": {
+                                "name": "Standard_LRS"
+                            }
+                        },
+                        {
+                            "name": "[concat(variables('functionStorageAccountNamePrefix'), parameters('stamps')[copyIndex('stampsCopy')].suffix)]",
+                            "type": "Microsoft.Storage/storageAccounts",
+                            "apiVersion": "2016-01-01",
+                            "location": "[parameters('stamps')[copyIndex('stampsCopy')].regionId]",
+                            "kind": "Storage",
+                            "sku": {
+                                "name": "Standard_LRS"
+                            }
+                        },
+                        {
+                            "name": "[concat(variables('mediaEncodingStorageAccountNamePrefix'), parameters('stamps')[copyIndex('stampsCopy')].suffix)]",
+                            "type": "Microsoft.Storage/storageAccounts",
+                            "apiVersion": "2016-01-01",
+                            "location": "[parameters('stamps')[copyIndex('stampsCopy')].regionId]",
+                            "kind": "Storage",
+                            "sku": {
+                                "name": "Standard_LRS"
+                            }
+                        },
+                        {
+                            "name": "[concat(variables('ingestionCdnProfileNamePrefix'), parameters('stamps')[copyIndex('stampsCopy')].suffix)]",
+                            "type": "Microsoft.Cdn/profiles",
+                            "apiVersion": "2016-04-02",
+                            "location": "[parameters('stamps')[copyIndex('stampsCopy')].regionId]",
+                            "sku": {
+                                "name": "Standard_Akamai"
+                            }
+                        },
+                        {
+                            "name": "[concat(variables('mediaServicesNamePrefix'), parameters('stamps')[copyIndex()].suffix)]",
+                            "type": "Microsoft.Media/mediaServices",
+                            "apiVersion": "2015-10-01",
+                            "location": "[parameters('stamps')[copyIndex()].regionId]",
+                            "properties": {
+                                "storageAccounts": [
+                                    {
+                                        "id": "[resourceId('Microsoft.Storage/storageAccounts', concat(variables('mediaEncodingStorageAccountNamePrefix'), parameters('stamps')[copyIndex()].suffix))]",
+                                        "isPrimary": true
+                                    }
+                                ]
+                            },
+                            "dependsOn": [
+                                "[resourceId('Microsoft.Storage/storageAccounts', concat(variables('mediaEncodingStorageAccountNamePrefix'), parameters('stamps')[copyIndex()].suffix))]"
+                            ]
+                        },
+                        {
+                            "name": "[concat(variables('ingestionCdnProfileNamePrefix'), parameters('stamps')[copyIndex('stampsCopy')].suffix, '/', variables('ingestionCdnEndpointNamePrefix'), parameters('stamps')[copyIndex('stampsCopy')].suffix)]",
+                            "type": "Microsoft.Cdn/profiles/endpoints",
+                            "apiVersion": "2016-04-02",
+                            "location": "[parameters('stamps')[copyIndex('stampsCopy')].regionId]",
+                            "properties": {
+                                "originHostHeader": "[reference(concat(variables('ingestionStorageAccountNamePrefix'), parameters('stamps')[copyIndex()].suffix)).primaryEndpoints.blob]",
+                                "isHttpAllowed": false,
+                                "isHttpsAllowed": true,
+                                "origins": [
+                                    {
+                                        "name": "ingestionBlobStorageEndpoint",
+                                        "properties": {
+                                            "hostName": "[reference(concat(variables('ingestionStorageAccountNamePrefix'), parameters('stamps')[copyIndex()].suffix)).primaryEndpoints.blob]"
+                                        }
+                                    }
+                                ]
+                            },
+                            "dependsOn": [
+                                "[resourceId('Microsoft.Cdn/profiles', concat(variables('ingestionCdnProfileNamePrefix'), parameters('stamps')[copyIndex('stampsCopy')].suffix))]",
+                                "[resourceId('Microsoft.Storage/storageAccounts', concat(variables('ingestionStorageAccountNamePrefix'), parameters('stamps')[copyIndex('stampsCopy')].suffix))]"
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
