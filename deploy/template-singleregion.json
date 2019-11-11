@@ -7,23 +7,25 @@
             "defaultValue": "[resourceGroup().location]"
         },
         "resourceNamePrefix": {
-            "type": "string",
-            "defaultValue": "[uniqueString(subscription().subscriptionId, resourceGroup().name)]"
+            "type": "string"
+        },
+        "resourceNameSuffix": {
+            "type": "string"
         }
     },
     "variables": {
-        "ingestionStorageAccountNamePrefix": "[concat(parameters('resourceNamePrefix'), 'ingst')]",
-        "ingestionCdnProfileNamePrefix": "[concat(parameters('resourceNamePrefix'), 'ingcdnprofile')]",
-        "ingestionCdnEndpointNamePrefix": "[concat(parameters('resourceNamePrefix'), 'ingcdn')]",
-        "appServicePlanNamePrefix": "[concat(parameters('resourceNamePrefix'), 'asp')]",
-        "functionStorageAccountNamePrefix": "[concat(parameters('resourceNamePrefix'), 'fnst')]",
-        "functionAppNamePrefix": "[concat(parameters('resourceNamePrefix'), 'fn')]",
-        "mediaEncodingStorageAccountNamePrefix": "[concat(parameters('resourceNamePrefix'), 'amsst')]",
-        "mediaServicesNamePrefix": "[concat(parameters('resourceNamePrefix'), 'ams')]"
+        "ingestionStorageAccountName": "[concat(parameters('resourceNamePrefix'), 'ingst', parameters('resourceNameSuffix'))]",
+        "ingestionCdnProfileName": "[concat(parameters('resourceNamePrefix'), 'ingcdnprofile', parameters('resourceNameSuffix'))]",
+        "ingestionCdnEndpointName": "[concat(parameters('resourceNamePrefix'), 'ingcdn', parameters('resourceNameSuffix'))]",
+        "appServicePlanName": "[concat(parameters('resourceNamePrefix'), 'asp', parameters('resourceNameSuffix'))]",
+        "functionStorageAccountName": "[concat(parameters('resourceNamePrefix'), 'fnst', parameters('resourceNameSuffix'))]",
+        "functionAppName": "[concat(parameters('resourceNamePrefix'), 'fn', parameters('resourceNameSuffix'))]",
+        "mediaEncodingStorageAccountName": "[concat(parameters('resourceNamePrefix'), 'amsst', parameters('resourceNameSuffix'))]",
+        "mediaServicesName": "[concat(parameters('resourceNamePrefix'), 'ams', parameters('resourceNameSuffix'))]"
     },
     "resources": [
         {
-            "name": "[variables('ingestionStorageAccountNamePrefix')]",
+            "name": "[variables('ingestionStorageAccountName')]",
             "type": "Microsoft.Storage/storageAccounts",
             "apiVersion": "2016-01-01",
             "location": "[parameters('regionId')]",
@@ -33,7 +35,7 @@
             }
         },
         {
-            "name": "[variables('functionStorageAccountNamePrefix')]",
+            "name": "[variables('functionStorageAccountName')]",
             "type": "Microsoft.Storage/storageAccounts",
             "apiVersion": "2016-01-01",
             "location": "[parameters('regionId')]",
@@ -43,7 +45,7 @@
             }
         },
         {
-            "name": "[variables('mediaEncodingStorageAccountNamePrefix')]",
+            "name": "[variables('mediaEncodingStorageAccountName')]",
             "type": "Microsoft.Storage/storageAccounts",
             "apiVersion": "2016-01-01",
             "location": "[parameters('regionId')]",
@@ -53,52 +55,54 @@
             }
         },
         {
-            "name": "[variables('ingestionCdnProfileNamePrefix')]",
+            "name": "[variables('ingestionCdnProfileName')]",
             "type": "Microsoft.Cdn/profiles",
             "apiVersion": "2016-04-02",
             "location": "[parameters('regionId')]",
             "sku": {
                 "name": "Standard_Akamai"
-            }
+            },
+            "resources": [
+                {
+                    "name": "[variables('ingestionCdnProfileName')]",
+                    "type": "endpoints",
+                    "apiVersion": "2019-04-15",
+                    "location": "[parameters('regionId')]",
+                    "properties": {
+                        "originHostHeader": "[replace(replace(reference(variables('ingestionStorageAccountName')).primaryEndpoints.blob, 'https://', ''), '/', '')]",
+                        "isHttpAllowed": false,
+                        "isHttpsAllowed": true,
+                        "origins": [
+                            {
+                                "name": "ingestionBlobStorageEndpoint",
+                                "properties": {
+                                    "hostName": "[replace(replace(reference(variables('ingestionStorageAccountName')).primaryEndpoints.blob, 'https://', ''), '/', '')]"
+                                }
+                            }
+                        ]
+                    },
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Cdn/profiles', variables('ingestionCdnProfileName'))]",
+                        "[resourceId('Microsoft.Storage/storageAccounts', variables('ingestionStorageAccountName'))]"
+                    ]
+                }
+            ]
         },
         {
-            "name": "[variables('mediaServicesNamePrefix')]",
+            "name": "[variables('mediaServicesName')]",
             "type": "Microsoft.Media/mediaServices",
             "apiVersion": "2015-10-01",
             "location": "[parameters('regionId')]",
             "properties": {
                 "storageAccounts": [
                     {
-                        "id": "[resourceId('Microsoft.Storage/storageAccounts', variables('mediaEncodingStorageAccountNamePrefix'))]",
+                        "id": "[resourceId('Microsoft.Storage/storageAccounts', variables('mediaEncodingStorageAccountName'))]",
                         "isPrimary": true
                     }
                 ]
             },
             "dependsOn": [
-                "[resourceId('Microsoft.Storage/storageAccounts', variables('mediaEncodingStorageAccountNamePrefix'))]"
-            ]
-        },
-        {
-            "name": "[concat(variables('ingestionCdnProfileNamePrefix'), '/', variables('ingestionCdnProfileNamePrefix'))]",
-            "type": "Microsoft.Cdn/profiles/endpoints",
-            "apiVersion": "2019-04-15",
-            "location": "[parameters('regionId')]",
-            "properties": {
-                "originHostHeader": "[reference(variables('ingestionStorageAccountNamePrefix')).primaryEndpoints.blob]",
-                "isHttpAllowed": false,
-                "isHttpsAllowed": true,
-                "origins": [
-                    {
-                        "name": "ingestionBlobStorageEndpoint",
-                        "properties": {
-                            "hostName": "[reference(variables('ingestionStorageAccountNamePrefix')).primaryEndpoints.blob]"
-                        }
-                    }
-                ]
-            },
-            "dependsOn": [
-                "[resourceId('Microsoft.Cdn/profiles', variables('ingestionCdnProfileNamePrefix'))]",
-                "[resourceId('Microsoft.Storage/storageAccounts', variables('ingestionStorageAccountNamePrefix'))]"
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('mediaEncodingStorageAccountName'))]"
             ]
         }
     ]
