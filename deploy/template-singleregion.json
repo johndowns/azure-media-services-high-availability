@@ -22,7 +22,8 @@
         "functionStorageAccountId": "[resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageAccountName'))]",
         "functionAppName": "[concat(parameters('resourceNamePrefix'), 'fn', parameters('resourceNameSuffix'))]",
         "mediaEncodingStorageAccountName": "[concat(parameters('resourceNamePrefix'), 'amsst', parameters('resourceNameSuffix'))]",
-        "mediaServicesName": "[concat(parameters('resourceNamePrefix'), 'ams', parameters('resourceNameSuffix'))]"
+        "mediaServicesName": "[concat(parameters('resourceNamePrefix'), 'ams', parameters('resourceNameSuffix'))]",
+        "mediaServicesEventGridSubscriptionName": "job-status-updates"
     },
     "resources": [
         {
@@ -82,7 +83,7 @@
         },
         {
             "name": "[variables('appServicePlanName')]",
-            "type": "Microsoft.Web/serverfarms",
+            "type": "Microsoft.Web/serverFarms",
             "apiVersion": "2018-02-01",
             "location": "[parameters('regionId')]",
             "sku": {
@@ -101,7 +102,7 @@
             "location": "[parameters('regionId')]",
             "kind": "functionapp",
             "properties": {
-                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('hostingPlanName'))]",
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
                 "siteConfig": {
                     "appSettings": [
                         {
@@ -131,8 +132,21 @@
                     ]
                 }
             },
+            "resources": [
+                {
+                    "name": "default/eventGrid",
+                    "type": "host/systemKeys",
+                    "apiVersion": "2018-11-01",
+                    "properties": {
+                        "name": "eventGrid"
+                    },
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
+                    ]
+                }
+            ],
             "dependsOn": [
-                "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+                "[resourceId('Microsoft.Web/serverFarms', variables('appServicePlanName'))]",
                 "[resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageAccountName'))]"
             ]
         },
@@ -154,7 +168,6 @@
                 "[resourceId('Microsoft.Storage/storageAccounts', variables('mediaEncodingStorageAccountName'))]"
             ]
         },
-        // TODO add Event Grid subscription
 
         {
             "name": "[variables('mediaEncodingStorageAccountName')]",
