@@ -19,6 +19,7 @@
         "ingestionCdnEndpointName": "[concat(parameters('resourceNamePrefix'), 'ingcdn', parameters('resourceNameSuffix'))]",
         "appServicePlanName": "[concat(parameters('resourceNamePrefix'), 'asp', parameters('resourceNameSuffix'))]",
         "functionStorageAccountName": "[concat(parameters('resourceNamePrefix'), 'fnst', parameters('resourceNameSuffix'))]",
+        "functionStorageAccountId": "[resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageAccountName'))]",
         "functionAppName": "[concat(parameters('resourceNamePrefix'), 'fn', parameters('resourceNameSuffix'))]",
         "mediaEncodingStorageAccountName": "[concat(parameters('resourceNamePrefix'), 'amsst', parameters('resourceNameSuffix'))]",
         "mediaServicesName": "[concat(parameters('resourceNamePrefix'), 'ams', parameters('resourceNameSuffix'))]"
@@ -26,26 +27,6 @@
     "resources": [
         {
             "name": "[variables('ingestionStorageAccountName')]",
-            "type": "Microsoft.Storage/storageAccounts",
-            "apiVersion": "2016-01-01",
-            "location": "[parameters('regionId')]",
-            "kind": "Storage",
-            "sku": {
-                "name": "Standard_LRS"
-            }
-        },
-        {
-            "name": "[variables('functionStorageAccountName')]",
-            "type": "Microsoft.Storage/storageAccounts",
-            "apiVersion": "2016-01-01",
-            "location": "[parameters('regionId')]",
-            "kind": "Storage",
-            "sku": {
-                "name": "Standard_LRS"
-            }
-        },
-        {
-            "name": "[variables('mediaEncodingStorageAccountName')]",
             "type": "Microsoft.Storage/storageAccounts",
             "apiVersion": "2016-01-01",
             "location": "[parameters('regionId')]",
@@ -88,6 +69,62 @@
                 }
             ]
         },
+
+        {
+            "name": "[variables('functionStorageAccountName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2016-01-01",
+            "location": "[parameters('regionId')]",
+            "kind": "Storage",
+            "sku": {
+                "name": "Standard_LRS"
+            }
+        },
+        {
+            "name": "[variables('appServicePlanName')]",
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2018-02-01",
+            "location": "[parameters('regionId')]",
+            "sku": {
+                "name": "Y1",
+                "tier": "Dynamic"
+            },
+            "properties": {
+                "name": "[variables('appServicePlanName')]",
+                "computeMode": "Dynamic"
+            }
+        },
+        {
+            "name": "[variables('functionAppName')]",
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2015-08-01",
+            "location": "[parameters('regionId')]",
+            "kind": "functionapp",
+            "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('hostingPlanName'))]",
+                "siteConfig": {
+                    "appSettings": [
+                        {
+                            "name": "AzureWebJobsDashboard",
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('functionStorageAccountName'), ';AccountKey=', listKeys(variables('functionStorageAccountId'),'2015-05-01-preview').key1)]"
+                        },
+                        {
+                            "name": "AzureWebJobsStorage",
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('functionStorageAccountName'), ';AccountKey=', listKeys(variables('functionStorageAccountId'),'2015-05-01-preview').key1)]"
+                        },
+                        {
+                            "name": "FUNCTIONS_EXTENSION_VERSION",
+                            "value": "~2"
+                        }
+                    ]
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageAccountName'))]"
+            ]
+        },
+
         {
             "name": "[variables('mediaServicesName')]",
             "type": "Microsoft.Media/mediaServices",
@@ -104,6 +141,17 @@
             "dependsOn": [
                 "[resourceId('Microsoft.Storage/storageAccounts', variables('mediaEncodingStorageAccountName'))]"
             ]
-        }
+        },
+
+        {
+            "name": "[variables('mediaEncodingStorageAccountName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2016-01-01",
+            "location": "[parameters('regionId')]",
+            "kind": "Storage",
+            "sku": {
+                "name": "Standard_LRS"
+            }
+        },
     ]
 }
