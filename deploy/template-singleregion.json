@@ -115,6 +115,18 @@
                         {
                             "name": "FUNCTIONS_EXTENSION_VERSION",
                             "value": "~2"
+                        },
+                        {
+                            "name": "MediaServices:Endpoints:Primary",
+                            "value": "TODO"
+                        },
+                        {
+                            "name": "MediaServices:Keys:Primary",
+                            "value": "TODO"
+                        },
+                        {
+                            "name": "MediaServices:Endpoints:Secondary",
+                            "value": "TODO"
                         }
                     ]
                 }
@@ -142,6 +154,7 @@
                 "[resourceId('Microsoft.Storage/storageAccounts', variables('mediaEncodingStorageAccountName'))]"
             ]
         },
+        // TODO add Event Grid subscription
 
         {
             "name": "[variables('mediaEncodingStorageAccountName')]",
