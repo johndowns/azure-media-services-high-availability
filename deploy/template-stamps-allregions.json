@@ -16,6 +16,10 @@
                 {
                     "regionId": "westus",
                     "suffix": "wus"
+                },
+                {
+                    "regionId": "westeurope",
+                    "suffix": "weu"
                 }
             ]
         },
@@ -257,14 +261,6 @@
                                                 "functionStorageAccountName": "[variables('functionStorageAccountName')]",
                                                 "mediaServicesResourceName": "[variables('mediaServicesName')]"
                                             }
-                                        },
-                                        "functionAppPrincipalId": { // TODO can I remove this?
-                                            "type": "string",
-                                            "value": "[reference(concat(resourceId('Microsoft.Web/sites', variables('functionAppName')), '/providers/Microsoft.ManagedIdentity/identities/default'), '2015-08-31-PREVIEW').principalId]"
-                                        },
-                                        "mediaServicesResourceName": { // TODO can I remove this?
-                                            "type": "string",   
-                                            "value": "[variables('mediaServicesName')]"
                                         }
                                     }
                                 }
@@ -283,14 +279,14 @@
                             "type": "array",
                             "copy": {
                                 "count": "[length(parameters('stamps'))]",
-                                "input": "[reference(resourceId('Microsoft.Resources/deployments', concat('stampTemplate-', parameters('stamps')[copyIndex()].suffix))).outputs.functionAppPrincipalId.value]"
+                                "input": "[reference(resourceId('Microsoft.Resources/deployments', concat('stampTemplate-', parameters('stamps')[copyIndex()].suffix))).outputs.stampConfiguration.value.functionAppPrincipalId]"
                             }
                         },
                         "mediaServicesResourceNames": {
                             "type": "array",
                             "copy": {
                                 "count": "[length(parameters('stamps'))]",
-                                "input": "[reference(resourceId('Microsoft.Resources/deployments', concat('stampTemplate-', parameters('stamps')[copyIndex()].suffix))).outputs.mediaServicesResourceName.value]"
+                                "input": "[reference(resourceId('Microsoft.Resources/deployments', concat('stampTemplate-', parameters('stamps')[copyIndex()].suffix))).outputs.stampConfiguration.value.mediaServicesResourceName]"
                             }
                         }
                     }
