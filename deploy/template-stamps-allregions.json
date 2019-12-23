@@ -24,7 +24,21 @@
             "defaultValue": "[uniqueString(subscription().subscriptionId, resourceGroup().name)]"
         }
     },
+    "variables": {
+        "applicationInsightsResourceName": "MediaEncoding"
+    },
     "resources": [
+        {
+            "name": "[variables('applicationInsightsResourceName')]",
+            "type": "Microsoft.Insights/components",
+            "location": "[resourceGroup().location]",
+            "apiVersion": "2015-05-01",
+            "kind": "web",
+            "properties": {
+                "Application_Type": "web"
+            }
+        },
+
         {
             "name": "allStamps",
             "type": "Microsoft.Resources/deployments",
@@ -239,16 +253,16 @@
                                             "type": "object",
                                             "value": {
                                                 "functionAppName": "[variables('functionAppName')]",
-                                                "functionAppPrincipalId": "[reference(concat(resourceId('Microsoft.Web/sites', variables('functionAppName')), '/providers/Microsoft.ManagedIdentity/Identities/default'), '2015-08-31-PREVIEW').principalId]",
+                                                "functionAppPrincipalId": "[reference(concat(resourceId('Microsoft.Web/sites', variables('functionAppName')), '/providers/Microsoft.ManagedIdentity/identities/default'), '2015-08-31-PREVIEW').principalId]",
                                                 "functionStorageAccountName": "[variables('functionStorageAccountName')]",
                                                 "mediaServicesResourceName": "[variables('mediaServicesName')]"
                                             }
                                         },
-                                        "functionAppPrincipalId": {
+                                        "functionAppPrincipalId": { // TODO can I remove this?
                                             "type": "string",
-                                            "value": "[reference(concat(resourceId('Microsoft.Web/sites', variables('functionAppName')), '/providers/Microsoft.ManagedIdentity/Identities/default'), '2015-08-31-PREVIEW').principalId]"
+                                            "value": "[reference(concat(resourceId('Microsoft.Web/sites', variables('functionAppName')), '/providers/Microsoft.ManagedIdentity/identities/default'), '2015-08-31-PREVIEW').principalId]"
                                         },
-                                        "mediaServicesResourceName": {
+                                        "mediaServicesResourceName": { // TODO can I remove this?
                                             "type": "string",   
                                             "value": "[variables('mediaServicesName')]"
                                         }
@@ -362,6 +376,9 @@
                     },
                     "allStampConfigurations": {
                         "value": "[reference(resourceId('Microsoft.Resources/deployments', 'allStamps')).outputs.stampConfigurations.value]"
+                    },
+                    "applicationInsightsInstrumentationKey": {
+                        "value": "[reference(resourceId('Microsoft.Insights/components', variables('applicationInsightsResourceName'))).instrumentationKey]"
                     }
                 },
                 "template": {
@@ -373,6 +390,9 @@
                         },
                         "allStampConfigurations": {
                             "type": "array"
+                        },
+                        "applicationInsightsInstrumentationKey": {
+                            "type": "string"
                         }
                     },
                     "variables": {
@@ -394,6 +414,7 @@
                                 "AzureWebJobsDashboard": "[concat('DefaultEndpointsProtocol=https;AccountName=', parameters('stampConfiguration').functionStorageAccountName, ';AccountKey=', listKeys(variables('functionStorageAccountId'),'2015-05-01-preview').key1)]",
                                 "AzureWebJobsStorage": "[concat('DefaultEndpointsProtocol=https;AccountName=', parameters('stampConfiguration').functionStorageAccountName, ';AccountKey=', listKeys(variables('functionStorageAccountId'),'2015-05-01-preview').key1)]",
                                 "FUNCTIONS_EXTENSION_VERSION": "~3",
+                                "APPINSIGHTS_INSTRUMENTATIONKEY": "[parameters('applicationInsightsInstrumentationKey')]",
                                 "MediaServices:Endpoints:Primary": "[parameters('stampConfiguration').mediaServicesResourceName]",
                                 "MediaServices:Endpoints:All": "[string(variables('allMediaServicesResourceNames'))]"
                             }
@@ -402,7 +423,8 @@
                 }
             },
             "dependsOn": [
-                "allStamps"
+                "allStamps",
+                "[resourceId('Microsoft.Insights/components', variables('applicationInsightsResourceName'))]"
             ]
         }
     ]
