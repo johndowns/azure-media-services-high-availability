@@ -1,5 +1,5 @@
 {
-    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
         "stamps": {
@@ -26,11 +26,278 @@
     },
     "resources": [
         {
-            "name": "[concat('stampTemplate-', parameters('stamps')[copyIndex('stampsCopy')].suffix)]",
+            "name": "allStamps",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2019-05-01",
+            "properties": {
+                "mode": "Incremental",
+                "expressionEvaluationOptions": {
+                    "scope": "inner"    
+                },
+                "parameters": {
+                    "stamps": {
+                        "value": "[parameters('stamps')]"
+                    },
+                    "resourceNamePrefix": {
+                        "value": "[parameters('resourceNamePrefix')]"
+                    }
+                },
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "stamps": {
+                            "type": "array"
+                        },
+                        "resourceNamePrefix": {
+                            "type": "string"
+                        }
+                    },
+                    "resources": [
+                        {
+                            "name": "[concat('stampTemplate-', parameters('stamps')[copyIndex('stampsCopy')].suffix)]",
+                            "type": "Microsoft.Resources/deployments",
+                            "apiVersion": "2019-05-01",
+                            "copy": {
+                                "name": "stampsCopy",
+                                "count": "[length(parameters('stamps'))]"
+                            },
+                            "properties": {
+                                "mode": "Incremental",
+                                "expressionEvaluationOptions": {
+                                    "scope": "inner"    
+                                },
+                                "parameters": {
+                                    "regionId": {
+                                        "value": "[parameters('stamps')[copyIndex('stampsCopy')].regionId]"
+                                    },
+                                    "resourceNamePrefix": {
+                                        "value": "[parameters('resourceNamePrefix')]"
+                                    },
+                                    "resourceNameSuffix":  {
+                                        "value": "[parameters('stamps')[copyIndex('stampsCopy')].suffix]"
+                                    }
+                                },
+                                "template": {
+                                    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                                    "contentVersion": "1.0.0.0",
+                                    "parameters": {
+                                        "regionId": {
+                                            "type": "string",
+                                            "defaultValue": "[resourceGroup().location]"
+                                        },
+                                        "resourceNamePrefix": {
+                                            "type": "string"
+                                        },
+                                        "resourceNameSuffix": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "variables": {
+                                        "ingestionStorageAccountName": "[concat(parameters('resourceNamePrefix'), 'ingst', parameters('resourceNameSuffix'))]",
+                                        "ingestionCdnProfileName": "[concat(parameters('resourceNamePrefix'), 'ingcdnprofile', parameters('resourceNameSuffix'))]",
+                                        "ingestionCdnEndpointName": "[concat(parameters('resourceNamePrefix'), 'ingcdn', parameters('resourceNameSuffix'))]",
+                                        "appServicePlanName": "[concat(parameters('resourceNamePrefix'), 'asp', parameters('resourceNameSuffix'))]",
+                                        "functionStorageAccountName": "[concat(parameters('resourceNamePrefix'), 'fnst', parameters('resourceNameSuffix'))]",
+                                        "functionStorageAccountId": "[resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageAccountName'))]",
+                                        "functionAppName": "[concat(parameters('resourceNamePrefix'), 'fn', parameters('resourceNameSuffix'))]",
+                                        "mediaEncodingStorageAccountName": "[concat(parameters('resourceNamePrefix'), 'amsst', parameters('resourceNameSuffix'))]",
+                                        "mediaServicesName": "[concat(parameters('resourceNamePrefix'), 'ams', parameters('resourceNameSuffix'))]",
+                                        "mediaServicesEventGridSubscriptionName": "job-status-updates"
+                                    },
+                                    "resources": [
+                                        {
+                                            "name": "[variables('ingestionStorageAccountName')]",
+                                            "type": "Microsoft.Storage/storageAccounts",
+                                            "apiVersion": "2016-01-01",
+                                            "location": "[parameters('regionId')]",
+                                            "kind": "Storage",
+                                            "sku": {
+                                                "name": "Standard_LRS"
+                                            }
+                                        },
+                                        {
+                                            "name": "[variables('ingestionCdnProfileName')]",
+                                            "type": "Microsoft.Cdn/profiles",
+                                            "apiVersion": "2016-04-02",
+                                            "location": "[parameters('regionId')]",
+                                            "sku": {
+                                                "name": "Standard_Akamai"
+                                            },
+                                            "resources": [
+                                                {
+                                                    "name": "[variables('ingestionCdnProfileName')]",
+                                                    "type": "endpoints",
+                                                    "apiVersion": "2019-04-15",
+                                                    "location": "[parameters('regionId')]",
+                                                    "properties": {
+                                                        "originHostHeader": "[replace(replace(reference(variables('ingestionStorageAccountName')).primaryEndpoints.blob, 'https://', ''), '/', '')]",
+                                                        "isHttpAllowed": false,
+                                                        "isHttpsAllowed": true,
+                                                        "origins": [
+                                                            {
+                                                                "name": "ingestionBlobStorageEndpoint",
+                                                                "properties": {
+                                                                    "hostName": "[replace(replace(reference(variables('ingestionStorageAccountName')).primaryEndpoints.blob, 'https://', ''), '/', '')]"
+                                                                }
+                                                            }
+                                                        ]
+                                                    },
+                                                    "dependsOn": [
+                                                        "[resourceId('Microsoft.Cdn/profiles', variables('ingestionCdnProfileName'))]",
+                                                        "[resourceId('Microsoft.Storage/storageAccounts', variables('ingestionStorageAccountName'))]"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                
+                                        {
+                                            "name": "[variables('functionStorageAccountName')]",
+                                            "type": "Microsoft.Storage/storageAccounts",
+                                            "apiVersion": "2016-01-01",
+                                            "location": "[parameters('regionId')]",
+                                            "kind": "Storage",
+                                            "sku": {
+                                                "name": "Standard_LRS"
+                                            }
+                                        },
+                                        {
+                                            "name": "[variables('appServicePlanName')]",
+                                            "type": "Microsoft.Web/serverFarms",
+                                            "apiVersion": "2018-02-01",
+                                            "location": "[parameters('regionId')]",
+                                            "sku": {
+                                                "name": "Y1",
+                                                "tier": "Dynamic"
+                                            },
+                                            "properties": {
+                                                "name": "[variables('appServicePlanName')]",
+                                                "computeMode": "Dynamic"
+                                            }
+                                        },
+                                        {
+                                            "name": "[variables('functionAppName')]",
+                                            "type": "Microsoft.Web/sites",
+                                            "apiVersion": "2015-08-01",
+                                            "location": "[parameters('regionId')]",
+                                            "kind": "functionapp",
+                                            "identity": {
+                                                "type": "SystemAssigned"
+                                            },
+                                            "properties": {
+                                                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+                                                "siteConfig": {
+                                                    "appSettings": [
+                                                        {
+                                                            "name": "AzureWebJobsDashboard",
+                                                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('functionStorageAccountName'), ';AccountKey=', listKeys(variables('functionStorageAccountId'),'2015-05-01-preview').key1)]"
+                                                        },
+                                                        {
+                                                            "name": "AzureWebJobsStorage",
+                                                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('functionStorageAccountName'), ';AccountKey=', listKeys(variables('functionStorageAccountId'),'2015-05-01-preview').key1)]"
+                                                        },
+                                                        {
+                                                            "name": "FUNCTIONS_EXTENSION_VERSION",
+                                                            "value": "~2"
+                                                        },
+                                                        {
+                                                            "name": "MediaServices:Endpoints:Primary",
+                                                            "value": "[variables('mediaServicesName')]"
+                                                        },
+                                                        {
+                                                            "name": "MediaServices:Endpoints:Secondary",
+                                                            "value": "TODO"
+                                                        }
+                                                    ]
+                                                }
+                                            },
+                                            "resources": [
+                                                {
+                                                    "name": "default/eventGrid",
+                                                    "type": "host/systemKeys",
+                                                    "apiVersion": "2018-11-01",
+                                                    "properties": {
+                                                        "name": "eventGrid"
+                                                    },
+                                                    "dependsOn": [
+                                                        "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
+                                                    ]
+                                                }
+                                            ],
+                                            "dependsOn": [
+                                                "[resourceId('Microsoft.Web/serverFarms', variables('appServicePlanName'))]",
+                                                "[resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageAccountName'))]"
+                                            ]
+                                        },
+                                
+                                        {
+                                            "name": "[variables('mediaServicesName')]",
+                                            "type": "Microsoft.Media/mediaServices",
+                                            "apiVersion": "2018-07-01",
+                                            "location": "[parameters('regionId')]",
+                                            "properties": {
+                                                "storageAccounts": [
+                                                    {
+                                                        "id": "[resourceId('Microsoft.Storage/storageAccounts', variables('mediaEncodingStorageAccountName'))]",
+                                                        "type": "Primary"
+                                                    }
+                                                ]   
+                                            },
+                                            "dependsOn": [
+                                                "[resourceId('Microsoft.Storage/storageAccounts', variables('mediaEncodingStorageAccountName'))]"
+                                            ]
+                                        },
+                                        {
+                                            "name": "[variables('mediaEncodingStorageAccountName')]",
+                                            "type": "Microsoft.Storage/storageAccounts",
+                                            "apiVersion": "2016-01-01",
+                                            "location": "[parameters('regionId')]",
+                                            "kind": "Storage",
+                                            "sku": {
+                                                "name": "Standard_LRS"
+                                            }
+                                        }
+                                    ],
+                                    "outputs": {
+                                        "functionAppPrincipalId": {
+                                            "type": "string",
+                                            "value": "[reference(concat(resourceId('Microsoft.Web/sites', variables('functionAppName')), '/providers/Microsoft.ManagedIdentity/Identities/default'), '2015-08-31-PREVIEW').principalId]"
+                                        },
+                                        "mediaServicesResourceName": {
+                                            "type": "string",   
+                                            "value": "[variables('mediaServicesName')]"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "outputs": {
+                        "functionAppPrincipalIds": {
+                            "type": "array",
+                            "copy": {
+                                "count": "[length(parameters('stamps'))]",
+                                "input": "[reference(resourceId('Microsoft.Resources/deployments', concat('stampTemplate-', parameters('stamps')[copyIndex()].suffix))).outputs.functionAppPrincipalId.value]"
+                            }
+                        },
+                        "mediaServicesResourceNames": {
+                            "type": "array",
+                            "copy": {
+                                "count": "[length(parameters('stamps'))]",
+                                "input": "[reference(resourceId('Microsoft.Resources/deployments', concat('stampTemplate-', parameters('stamps')[copyIndex()].suffix))).outputs.mediaServicesResourceName.value]"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        {
+            "name": "[concat('roleAssignments-', parameters('stamps')[copyIndex('stampsRoleAssignmentsCopy')].suffix)]",
             "type": "Microsoft.Resources/deployments",
             "apiVersion": "2019-05-01",
             "copy": {
-                "name": "stampsCopy",
+                "name": "stampsRoleAssignmentsCopy",
                 "count": "[length(parameters('stamps'))]"
             },
             "properties": {
@@ -39,208 +306,47 @@
                     "scope": "inner"    
                 },
                 "parameters": {
-                    "regionId": {
-                        "value": "[parameters('stamps')[copyIndex('stampsCopy')].regionId]"
+                    "mediaServicesResourceName": {
+                        "value": "[reference(resourceId('Microsoft.Resources/deployments', 'allStamps')).outputs.mediaServicesResourceNames.value[copyIndex('stampsRoleAssignmentsCopy')]]"
                     },
-                    "resourceNamePrefix": {
-                        "value": "[parameters('resourceNamePrefix')]"
-                    },
-                    "resourceNameSuffix":  {
-                        "value": "[parameters('stamps')[copyIndex('stampsCopy')].suffix]"
+                    "functionAppPrincipalIds": {
+                        "value": "[reference(resourceId('Microsoft.Resources/deployments', 'allStamps')).outputs.functionAppPrincipalIds.value]"
                     }
                 },
                 "template": {
                     "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
                     "contentVersion": "1.0.0.0",
                     "parameters": {
-                        "regionId": {
-                            "type": "string",
-                            "defaultValue": "[resourceGroup().location]"
-                        },
-                        "resourceNamePrefix": {
+                        "mediaServicesResourceName": {
                             "type": "string"
                         },
-                        "resourceNameSuffix": {
-                            "type": "string"
+                        "functionAppPrincipalIds": {
+                            "type": "array"
                         }
                     },
                     "variables": {
-                        "ingestionStorageAccountName": "[concat(parameters('resourceNamePrefix'), 'ingst', parameters('resourceNameSuffix'))]",
-                        "ingestionCdnProfileName": "[concat(parameters('resourceNamePrefix'), 'ingcdnprofile', parameters('resourceNameSuffix'))]",
-                        "ingestionCdnEndpointName": "[concat(parameters('resourceNamePrefix'), 'ingcdn', parameters('resourceNameSuffix'))]",
-                        "appServicePlanName": "[concat(parameters('resourceNamePrefix'), 'asp', parameters('resourceNameSuffix'))]",
-                        "functionStorageAccountName": "[concat(parameters('resourceNamePrefix'), 'fnst', parameters('resourceNameSuffix'))]",
-                        "functionStorageAccountId": "[resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageAccountName'))]",
-                        "functionAppName": "[concat(parameters('resourceNamePrefix'), 'fn', parameters('resourceNameSuffix'))]",
-                        "mediaEncodingStorageAccountName": "[concat(parameters('resourceNamePrefix'), 'amsst', parameters('resourceNameSuffix'))]",
-                        "mediaServicesName": "[concat(parameters('resourceNamePrefix'), 'ams', parameters('resourceNameSuffix'))]",
-                        "mediaServicesEventGridSubscriptionName": "job-status-updates"
+                        "contributorRoleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]"
                     },
                     "resources": [
                         {
-                            "name": "[variables('ingestionStorageAccountName')]",
-                            "type": "Microsoft.Storage/storageAccounts",
-                            "apiVersion": "2016-01-01",
-                            "location": "[parameters('regionId')]",
-                            "kind": "Storage",
-                            "sku": {
-                                "name": "Standard_LRS"
-                            }
-                        },
-                        {
-                            "name": "[variables('ingestionCdnProfileName')]",
-                            "type": "Microsoft.Cdn/profiles",
-                            "apiVersion": "2016-04-02",
-                            "location": "[parameters('regionId')]",
-                            "sku": {
-                                "name": "Standard_Akamai"
-                            },
-                            "resources": [
-                                {
-                                    "name": "[variables('ingestionCdnProfileName')]",
-                                    "type": "endpoints",
-                                    "apiVersion": "2019-04-15",
-                                    "location": "[parameters('regionId')]",
-                                    "properties": {
-                                        "originHostHeader": "[replace(replace(reference(variables('ingestionStorageAccountName')).primaryEndpoints.blob, 'https://', ''), '/', '')]",
-                                        "isHttpAllowed": false,
-                                        "isHttpsAllowed": true,
-                                        "origins": [
-                                            {
-                                                "name": "ingestionBlobStorageEndpoint",
-                                                "properties": {
-                                                    "hostName": "[replace(replace(reference(variables('ingestionStorageAccountName')).primaryEndpoints.blob, 'https://', ''), '/', '')]"
-                                                }
-                                            }
-                                        ]
-                                    },
-                                    "dependsOn": [
-                                        "[resourceId('Microsoft.Cdn/profiles', variables('ingestionCdnProfileName'))]",
-                                        "[resourceId('Microsoft.Storage/storageAccounts', variables('ingestionStorageAccountName'))]"
-                                    ]
-                                }
-                            ]
-                        },
-                
-                        {
-                            "name": "[variables('functionStorageAccountName')]",
-                            "type": "Microsoft.Storage/storageAccounts",
-                            "apiVersion": "2016-01-01",
-                            "location": "[parameters('regionId')]",
-                            "kind": "Storage",
-                            "sku": {
-                                "name": "Standard_LRS"
-                            }
-                        },
-                        {
-                            "name": "[variables('appServicePlanName')]",
-                            "type": "Microsoft.Web/serverFarms",
-                            "apiVersion": "2018-02-01",
-                            "location": "[parameters('regionId')]",
-                            "sku": {
-                                "name": "Y1",
-                                "tier": "Dynamic"
+                            "name": "[concat(parameters('mediaServicesResourceName'), '/Microsoft.Authorization/', guid(subscription().subscriptionId, resourceGroup().id, parameters('mediaServicesResourceName'), parameters('functionAppPrincipalIds')[copyIndex('functionPrincipalIdsCopy')]))]",
+                            "type": "Microsoft.Media/mediaServices/providers/roleAssignments",
+                            "apiVersion": "2018-09-01-preview",
+                            "copy": {
+                                "name": "functionPrincipalIdsCopy",
+                                "count": "[length(parameters('functionAppPrincipalIds'))]"
                             },
                             "properties": {
-                                "name": "[variables('appServicePlanName')]",
-                                "computeMode": "Dynamic"
-                            }
-                        },
-                        {
-                            "name": "[variables('functionAppName')]",
-                            "type": "Microsoft.Web/sites",
-                            "apiVersion": "2015-08-01",
-                            "location": "[parameters('regionId')]",
-                            "kind": "functionapp",
-                            "identity": {
-                                "type": "SystemAssigned"
-                            },
-                            "properties": {
-                                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
-                                "siteConfig": {
-                                    "appSettings": [
-                                        {
-                                            "name": "AzureWebJobsDashboard",
-                                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('functionStorageAccountName'), ';AccountKey=', listKeys(variables('functionStorageAccountId'),'2015-05-01-preview').key1)]"
-                                        },
-                                        {
-                                            "name": "AzureWebJobsStorage",
-                                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('functionStorageAccountName'), ';AccountKey=', listKeys(variables('functionStorageAccountId'),'2015-05-01-preview').key1)]"
-                                        },
-                                        {
-                                            "name": "FUNCTIONS_EXTENSION_VERSION",
-                                            "value": "~2"
-                                        },
-                                        {
-                                            "name": "MediaServices:Endpoints:Primary",
-                                            "value": "TODO"
-                                        },
-                                        {
-                                            "name": "MediaServices:Endpoints:Secondary",
-                                            "value": "TODO"
-                                        }
-                                    ]
-                                }
-                            },
-                            "resources": [
-                                {
-                                    "name": "default/eventGrid",
-                                    "type": "host/systemKeys",
-                                    "apiVersion": "2018-11-01",
-                                    "properties": {
-                                        "name": "eventGrid"
-                                    },
-                                    "dependsOn": [
-                                        "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
-                                    ]
-                                }
-                            ],
-                            "dependsOn": [
-                                "[resourceId('Microsoft.Web/serverFarms', variables('appServicePlanName'))]",
-                                "[resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageAccountName'))]"
-                            ]
-                        },
-                
-                        {
-                            "name": "[variables('mediaServicesName')]",
-                            "type": "Microsoft.Media/mediaServices",
-                            "apiVersion": "2018-07-01",
-                            "location": "[parameters('regionId')]",
-                            "properties": {
-                                "storageAccounts": [
-                                    {
-                                        "id": "[resourceId('Microsoft.Storage/storageAccounts', variables('mediaEncodingStorageAccountName'))]",
-                                        "type": "Primary"
-                                    }
-                                ]   
-                            },
-                            "dependsOn": [
-                                "[resourceId('Microsoft.Storage/storageAccounts', variables('mediaEncodingStorageAccountName'))]"
-                            ]
-                        },
-                        {
-                            "name": "[variables('mediaEncodingStorageAccountName')]",
-                            "type": "Microsoft.Storage/storageAccounts",
-                            "apiVersion": "2016-01-01",
-                            "location": "[parameters('regionId')]",
-                            "kind": "Storage",
-                            "sku": {
-                                "name": "Standard_LRS"
+                                "roleDefinitionId": "[variables('contributorRoleDefinitionId')]",
+                                "principalId": "[parameters('functionAppPrincipalIds')[copyIndex('functionPrincipalIdsCopy')]]"
                             }
                         }
-                    ],
-                    "outputs": {
-                        "functionAppIdentity": {
-                            "type": "string",
-                            "value": "[reference(concat(resourceId('Microsoft.Web/sites', variables('functionAppName')), '/providers/Microsoft.ManagedIdentity/Identities/default'), '2015-08-31-PREVIEW').principalId]"
-                        },
-                        "mediaServicesResourceId": {
-                            "type": "string",   
-                            "value": "[resourceId('Microsoft.Media/mediaServices', variables('mediaServicesName'))]"
-                        }
-                    }
+                    ]
                 }
-            }
+            },
+            "dependsOn": [
+                "allStamps"
+            ]
         }
     ]
 }
