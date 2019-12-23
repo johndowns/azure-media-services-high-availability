@@ -185,31 +185,7 @@
                                                 "type": "SystemAssigned"
                                             },
                                             "properties": {
-                                                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
-                                                "siteConfig": {
-                                                    "appSettings": [
-                                                        {
-                                                            "name": "AzureWebJobsDashboard",
-                                                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('functionStorageAccountName'), ';AccountKey=', listKeys(variables('functionStorageAccountId'),'2015-05-01-preview').key1)]"
-                                                        },
-                                                        {
-                                                            "name": "AzureWebJobsStorage",
-                                                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('functionStorageAccountName'), ';AccountKey=', listKeys(variables('functionStorageAccountId'),'2015-05-01-preview').key1)]"
-                                                        },
-                                                        {
-                                                            "name": "FUNCTIONS_EXTENSION_VERSION",
-                                                            "value": "~2"
-                                                        },
-                                                        {
-                                                            "name": "MediaServices:Endpoints:Primary",
-                                                            "value": "[variables('mediaServicesName')]"
-                                                        },
-                                                        {
-                                                            "name": "MediaServices:Endpoints:Secondary",
-                                                            "value": "TODO"
-                                                        }
-                                                    ]
-                                                }
+                                                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
                                             },
                                             "resources": [
                                                 {
@@ -259,6 +235,15 @@
                                         }
                                     ],
                                     "outputs": {
+                                        "stampConfiguration": {
+                                            "type": "object",
+                                            "value": {
+                                                "functionAppName": "[variables('functionAppName')]",
+                                                "functionAppPrincipalId": "[reference(concat(resourceId('Microsoft.Web/sites', variables('functionAppName')), '/providers/Microsoft.ManagedIdentity/Identities/default'), '2015-08-31-PREVIEW').principalId]",
+                                                "functionStorageAccountName": "[variables('functionStorageAccountName')]",
+                                                "mediaServicesResourceName": "[variables('mediaServicesName')]"
+                                            }
+                                        },
                                         "functionAppPrincipalId": {
                                             "type": "string",
                                             "value": "[reference(concat(resourceId('Microsoft.Web/sites', variables('functionAppName')), '/providers/Microsoft.ManagedIdentity/Identities/default'), '2015-08-31-PREVIEW').principalId]"
@@ -273,6 +258,13 @@
                         }
                     ],
                     "outputs": {
+                        "stampConfigurations": {
+                            "type": "array",
+                            "copy": {
+                                "count": "[length(parameters('stamps'))]",
+                                "input": "[reference(resourceId('Microsoft.Resources/deployments', concat('stampTemplate-', parameters('stamps')[copyIndex()].suffix))).outputs.stampConfiguration.value]"
+                            }
+                        },
                         "functionAppPrincipalIds": {
                             "type": "array",
                             "copy": {
@@ -292,6 +284,7 @@
             }
         },
 
+        // Deploy Azure RBAC role assignments to grant function apps Contributor role on all Media Services instances.
         {
             "name": "[concat('roleAssignments-', parameters('stamps')[copyIndex('stampsRoleAssignmentsCopy')].suffix)]",
             "type": "Microsoft.Resources/deployments",
@@ -339,6 +332,70 @@
                             "properties": {
                                 "roleDefinitionId": "[variables('contributorRoleDefinitionId')]",
                                 "principalId": "[parameters('functionAppPrincipalIds')[copyIndex('functionPrincipalIdsCopy')]]"
+                            }
+                        }
+                    ]
+                }
+            },
+            "dependsOn": [
+                "allStamps"
+            ]
+        },
+
+        // Deploy function app configuration settings, allowing the functions to refer to their own Media Services endpoint as well as all others.
+        {
+            "name": "[concat('functionSettings-', parameters('stamps')[copyIndex('stampsFunctionConfigurationCopy')].suffix)]",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2019-05-01",
+            "copy": {
+                "name": "stampsFunctionConfigurationCopy",
+                "count": "[length(parameters('stamps'))]"
+            },
+            "properties": {
+                "mode": "Incremental",
+                "expressionEvaluationOptions": {
+                    "scope": "inner"    
+                },
+                "parameters": {
+                    "stampConfiguration": {
+                        "value": "[reference(resourceId('Microsoft.Resources/deployments', 'allStamps')).outputs.stampConfigurations.value[copyIndex('stampsFunctionConfigurationCopy')]]"
+                    },
+                    "allStampConfigurations": {
+                        "value": "[reference(resourceId('Microsoft.Resources/deployments', 'allStamps')).outputs.stampConfigurations.value]"
+                    }
+                },
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "stampConfiguration": {
+                            "type": "object"
+                        },
+                        "allStampConfigurations": {
+                            "type": "array"
+                        }
+                    },
+                    "variables": {
+                        "functionStorageAccountId": "[resourceId('Microsoft.Storage/storageAccounts', parameters('stampConfiguration').functionStorageAccountName)]",
+                        "copy": [
+                            {
+                                "name": "allMediaServicesResourceNames",
+                                "count": "[length(parameters('allStampConfigurations'))]",
+                                "input": "[parameters('allStampConfigurations')[copyIndex('allMediaServicesResourceNames')].mediaServicesResourceName]"
+                            }
+                        ]
+                    },
+                    "resources": [
+                        {
+                            "name": "[concat(parameters('stampConfiguration').functionAppName, '/appsettings')]",
+                            "type": "Microsoft.Web/sites/config",
+                            "apiVersion": "2018-11-01",
+                            "properties": {
+                                "AzureWebJobsDashboard": "[concat('DefaultEndpointsProtocol=https;AccountName=', parameters('stampConfiguration').functionStorageAccountName, ';AccountKey=', listKeys(variables('functionStorageAccountId'),'2015-05-01-preview').key1)]",
+                                "AzureWebJobsStorage": "[concat('DefaultEndpointsProtocol=https;AccountName=', parameters('stampConfiguration').functionStorageAccountName, ';AccountKey=', listKeys(variables('functionStorageAccountId'),'2015-05-01-preview').key1)]",
+                                "FUNCTIONS_EXTENSION_VERSION": "~3",
+                                "MediaServices:Endpoints:Primary": "[parameters('stampConfiguration').mediaServicesResourceName]",
+                                "MediaServices:Endpoints:All": "[string(variables('allMediaServicesResourceNames'))]"
                             }
                         }
                     ]
