@@ -152,6 +152,9 @@
                             "apiVersion": "2015-08-01",
                             "location": "[parameters('regionId')]",
                             "kind": "functionapp",
+                            "identity": {
+                                "type": "SystemAssigned"
+                            },
                             "properties": {
                                 "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
                                 "siteConfig": {
@@ -170,10 +173,6 @@
                                         },
                                         {
                                             "name": "MediaServices:Endpoints:Primary",
-                                            "value": "TODO"
-                                        },
-                                        {
-                                            "name": "MediaServices:Keys:Primary",
                                             "value": "TODO"
                                         },
                                         {
@@ -205,15 +204,15 @@
                         {
                             "name": "[variables('mediaServicesName')]",
                             "type": "Microsoft.Media/mediaServices",
-                            "apiVersion": "2015-10-01",
+                            "apiVersion": "2018-07-01",
                             "location": "[parameters('regionId')]",
                             "properties": {
                                 "storageAccounts": [
                                     {
                                         "id": "[resourceId('Microsoft.Storage/storageAccounts', variables('mediaEncodingStorageAccountName'))]",
-                                        "isPrimary": true
+                                        "type": "Primary"
                                     }
-                                ]
+                                ]   
                             },
                             "dependsOn": [
                                 "[resourceId('Microsoft.Storage/storageAccounts', variables('mediaEncodingStorageAccountName'))]"
@@ -229,7 +228,17 @@
                                 "name": "Standard_LRS"
                             }
                         }
-                    ]
+                    ],
+                    "outputs": {
+                        "functionAppIdentity": {
+                            "type": "string",
+                            "value": "[reference(concat(resourceId('Microsoft.Web/sites', variables('functionAppName')), '/providers/Microsoft.ManagedIdentity/Identities/default'), '2015-08-31-PREVIEW').principalId]"
+                        },
+                        "mediaServicesResourceId": {
+                            "type": "string",   
+                            "value": "[resourceId('Microsoft.Media/mediaServices', variables('mediaServicesName'))]"
+                        }
+                    }
                 }
             }
         }
