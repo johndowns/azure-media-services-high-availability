@@ -1,27 +1,9 @@
-{
+    {
     "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
         "stamps": {
-            "type": "array",
-            "defaultValue": [
-                {
-                    "regionId": "eastus2",
-                    "suffix": "eus1"
-                },
-                {
-                    "regionId": "eastus2",
-                    "suffix": "eus2"
-                },
-                {
-                    "regionId": "westus",
-                    "suffix": "wus"
-                },
-                {
-                    "regionId": "westeurope",
-                    "suffix": "weu"
-                }
-            ]
+            "type": "array"
         },
         "resourceNamePrefix": {
             "type": "string",
@@ -73,7 +55,7 @@
                     },
                     "resources": [
                         {
-                            "name": "[concat('stampTemplate-', parameters('stamps')[copyIndex('stampsCopy')].suffix)]",
+                            "name": "[concat('stampTemplate-', parameters('stamps')[copyIndex('stampsCopy')].resourceNameSuffix)]",
                             "type": "Microsoft.Resources/deployments",
                             "apiVersion": "2019-05-01",
                             "copy": {
@@ -93,7 +75,7 @@
                                         "value": "[parameters('resourceNamePrefix')]"
                                     },
                                     "resourceNameSuffix":  {
-                                        "value": "[parameters('stamps')[copyIndex('stampsCopy')].suffix]"
+                                        "value": "[parameters('stamps')[copyIndex('stampsCopy')].resourceNameSuffix]"
                                     }
                                 },
                                 "template": {
@@ -272,21 +254,21 @@
                             "type": "array",
                             "copy": {
                                 "count": "[length(parameters('stamps'))]",
-                                "input": "[reference(resourceId('Microsoft.Resources/deployments', concat('stampTemplate-', parameters('stamps')[copyIndex()].suffix))).outputs.stampConfiguration.value]"
+                                "input": "[reference(resourceId('Microsoft.Resources/deployments', concat('stampTemplate-', parameters('stamps')[copyIndex()].resourceNameSuffix))).outputs.stampConfiguration.value]"
                             }
                         },
                         "functionAppPrincipalIds": {
                             "type": "array",
                             "copy": {
                                 "count": "[length(parameters('stamps'))]",
-                                "input": "[reference(resourceId('Microsoft.Resources/deployments', concat('stampTemplate-', parameters('stamps')[copyIndex()].suffix))).outputs.stampConfiguration.value.functionAppPrincipalId]"
+                                "input": "[reference(resourceId('Microsoft.Resources/deployments', concat('stampTemplate-', parameters('stamps')[copyIndex()].resourceNameSuffix))).outputs.stampConfiguration.value.functionAppPrincipalId]"
                             }
                         },
                         "mediaServicesResourceNames": {
                             "type": "array",
                             "copy": {
                                 "count": "[length(parameters('stamps'))]",
-                                "input": "[reference(resourceId('Microsoft.Resources/deployments', concat('stampTemplate-', parameters('stamps')[copyIndex()].suffix))).outputs.stampConfiguration.value.mediaServicesResourceName]"
+                                "input": "[reference(resourceId('Microsoft.Resources/deployments', concat('stampTemplate-', parameters('stamps')[copyIndex()].resourceNameSuffix))).outputs.stampConfiguration.value.mediaServicesResourceName]"
                             }
                         }
                     }
@@ -296,7 +278,7 @@
 
         // Deploy Azure RBAC role assignments to grant function apps Contributor role on all Media Services instances.
         {
-            "name": "[concat('roleAssignments-', parameters('stamps')[copyIndex('stampsRoleAssignmentsCopy')].suffix)]",
+            "name": "[concat('roleAssignments-', parameters('stamps')[copyIndex('stampsRoleAssignmentsCopy')].resourceNameSuffix)]",
             "type": "Microsoft.Resources/deployments",
             "apiVersion": "2019-05-01",
             "copy": {
@@ -354,7 +336,7 @@
 
         // Deploy function app configuration settings, allowing the functions to refer to their own Media Services endpoint as well as all others.
         {
-            "name": "[concat('functionSettings-', parameters('stamps')[copyIndex('stampsFunctionConfigurationCopy')].suffix)]",
+            "name": "[concat('functionSettings-', parameters('stamps')[copyIndex('stampsFunctionConfigurationCopy')].resourceNameSuffix)]",
             "type": "Microsoft.Resources/deployments",
             "apiVersion": "2019-05-01",
             "copy": {
