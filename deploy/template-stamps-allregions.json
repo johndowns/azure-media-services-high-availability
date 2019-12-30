@@ -391,6 +391,7 @@
                             "properties": {
                                 "AzureWebJobsDashboard": "[concat('DefaultEndpointsProtocol=https;AccountName=', parameters('stampConfiguration').functionStorageAccountName, ';AccountKey=', listKeys(variables('functionStorageAccountId'),'2015-05-01-preview').key1)]",
                                 "AzureWebJobsStorage": "[concat('DefaultEndpointsProtocol=https;AccountName=', parameters('stampConfiguration').functionStorageAccountName, ';AccountKey=', listKeys(variables('functionStorageAccountId'),'2015-05-01-preview').key1)]",
+                                "AzureWebJobsSecretStorageType": "files",
                                 "FUNCTIONS_EXTENSION_VERSION": "~3",
                                 "APPINSIGHTS_INSTRUMENTATIONKEY": "[parameters('applicationInsightsInstrumentationKey')]",
                                 "MediaServices:Endpoints:Primary": "[parameters('stampConfiguration').mediaServicesResourceName]",
