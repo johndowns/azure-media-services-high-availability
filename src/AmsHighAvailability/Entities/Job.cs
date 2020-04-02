@@ -1,5 +1,4 @@
-﻿using AmsHighAvailability.Configuration;
-using AmsHighAvailability.Models;
+﻿using AmsHighAvailability.Models;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Extensions.Options;
