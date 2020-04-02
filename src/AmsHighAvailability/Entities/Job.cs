@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace AmsHighAvailability.Entities
@@ -29,7 +30,7 @@ namespace AmsHighAvailability.Entities
         public string JobId { get; set; }
 
         [JsonProperty("inputData")]
-        public string InputData { get; set; } // URL or whatever is needed
+        public string InputData { get; set; } // URL or whatever is needed (TODO)
 
         [JsonProperty("submittedTime")]
         public DateTimeOffset SubmittedTime { get; set; }
@@ -46,9 +47,13 @@ namespace AmsHighAvailability.Entities
         [JsonIgnore]
         private readonly Configuration.Options _settings;
 
-        public Job(IOptions<Configuration.Options> options)
+        [JsonIgnore]
+        private readonly Random _random;
+
+        public Job(IOptions<Configuration.Options> options, Random random)
         {
             this._settings = options.Value;
+            this._random = random;
         }
 
         [FunctionName(nameof(Job))]
@@ -66,33 +71,61 @@ namespace AmsHighAvailability.Entities
 
         public void MarkAttemptAsSucceeded(string jobRunAttemptId)
         {
+            // TODO stop.
         }
 
         public void MarkAttemptAsCanceled(string jobRunAttemptId)
         {
+            // TODO start a new attempt on a different stamp.
         }
 
         public void MarkAttemptAsFailed(string jobRunAttemptId)
         {
+            // TODO start a new attempt on a different stamp.
         }
 
         public void MarkAttemptAsTimedOut(string jobRunAttemptId)
         {
             // TODO start a new attempt on a different stamp.
-            //StartAttempt();
         }
 
         private void StartAttempt()
         {
-            // Implement logic for round-robin and for regional affinity (TODO).
-            var stampId = "TODO-stamp";
+            var stampId = SelectStampIdForAttempt();
+            if (stampId == null)
+            {
+                // TODO consider the job to have failed.
+            }
 
-            // Start the attempt.
+            // Start the attempt on the selected stamp.
             var attemptId = $"{JobId}|{Guid.NewGuid()}";
             var attemptEntityId = new EntityId(nameof(JobRunAttempt), attemptId);
-            Entity.Current.SignalEntity<IJobRunAttempt>(attemptEntityId, proxy => proxy.Start((InputData, stampId)));
-
             Attempts.Add((stampId, attemptId));
+            Entity.Current.SignalEntity<IJobRunAttempt>(attemptEntityId, proxy => proxy.Start((InputData, stampId)));
+        }
+
+        private string SelectStampIdForAttempt()
+        {
+            // If we are using regional affinity then prefer using the home region if possible.
+            if (_settings.StampRoutingMethod == StampRoutingMethod.RegionalAffinity)
+            {
+                if (!Attempts.Any(a => a.stampId == _settings.HomeStampId))
+                {
+                    return _settings.HomeStampId;
+                }
+            }
+
+            // Otherwise, select a random stamp that has not already been used.
+            var allRemainingStamps = _settings.AlllStampIdsArray.Except(Attempts.Select(a => a.stampId));
+            if (allRemainingStamps.Any())
+            {
+                return allRemainingStamps
+                    .Skip(_random.Next(allRemainingStamps.Count()))
+                    .Take(1).Single();
+            }
+
+            // There are no more stamps available, so we can't start this attempt.
+            return null;
         }
     }
 }

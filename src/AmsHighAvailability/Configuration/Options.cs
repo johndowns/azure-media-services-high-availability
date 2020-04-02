@@ -1,9 +1,12 @@
-﻿using System;
+﻿using AmsHighAvailability.Models;
+using System;
 
 namespace AmsHighAvailability.Configuration
 {
     public class Options
     {
+        public StampRoutingMethod StampRoutingMethod { get; set; }
+
         public string HomeStampId { get; set; }
         public string AllStampIds { get; set; }
         public string[] AlllStampIdsArray { get { return AllStampIds.Split(';'); } }
