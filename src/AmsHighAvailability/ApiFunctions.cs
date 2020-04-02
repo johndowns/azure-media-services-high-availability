@@ -10,10 +10,10 @@ using AmsHighAvailability.Entities;
 
 namespace AmsHighAvailability
 {
-    public static class ApiFunctions
+    public class ApiFunctions
     {
-        [FunctionName("Function1")]
-        public static async Task<IActionResult> Run(
+        [FunctionName("CreateJob")]
+        public async Task<IActionResult> CreateJob(
             [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)

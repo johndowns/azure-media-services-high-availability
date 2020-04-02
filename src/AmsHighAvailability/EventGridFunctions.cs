@@ -11,10 +11,10 @@ using System.Threading.Tasks;
 
 namespace AmsHighAvailability
 {
-    public static class EventGridFunctions
+    public class EventGridFunctions
     {
         [FunctionName("EventGridFunctions")]
-        public static async Task Run(
+        public async Task Run(
             [EventGridTrigger]EventGridEvent eventGridEvent,
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
