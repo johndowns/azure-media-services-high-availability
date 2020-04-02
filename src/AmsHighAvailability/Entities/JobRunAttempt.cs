@@ -1,6 +1,7 @@
 ﻿using AmsHighAvailability.Models;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System;
 using System.Threading.Tasks;
@@ -39,6 +40,14 @@ namespace AmsHighAvailability.Entities
 
         [JsonProperty("lastStatusUpdateReceivedTime")]
         public DateTimeOffset? LastStatusUpdateReceivedTime { get; set; }
+
+        [JsonIgnore]
+        private readonly Configuration.Options _settings;
+
+        public JobRunAttempt(IOptions<Configuration.Options> options)
+        {
+            this._settings = options.Value;
+        }
 
         [FunctionName(nameof(JobRunAttempt))]
         public static Task Run([EntityTrigger] IDurableEntityContext ctx)

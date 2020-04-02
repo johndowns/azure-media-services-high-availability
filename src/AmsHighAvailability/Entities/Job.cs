@@ -1,6 +1,8 @@
-﻿using AmsHighAvailability.Models;
+﻿using AmsHighAvailability.Configuration;
+using AmsHighAvailability.Models;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -41,6 +43,14 @@ namespace AmsHighAvailability.Entities
 
         [JsonProperty("attempts")]
         public HashSet<(string stampId, string attemptId)> Attempts { get; set; } = new HashSet<(string stampId, string attemptId)>();
+
+        [JsonIgnore]
+        private readonly Configuration.Options _settings;
+
+        public Job(IOptions<Configuration.Options> options)
+        {
+            this._settings = options.Value;
+        }
 
         [FunctionName(nameof(Job))]
         public static Task Run([EntityTrigger] IDurableEntityContext ctx)
