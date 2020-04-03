@@ -83,7 +83,7 @@ namespace AmsHighAvailability.Entities
         private void UpdateJobStatus(JobStatus newJobStatus) // TODO handle the fact that an attempt might have come back with a success
         {
             Status = newJobStatus;
-            _log.LogInformation("Job has completed. JobId={JobId}, Status={JobStatus}", JobId, Status);
+            _log.LogInformation("Job has completed. JobId={JobId}, JobStatus={JobStatus}", JobId, Status);
         }
 
         public void MarkAttemptAsSucceeded(string jobRunAttemptId)
@@ -140,7 +140,7 @@ namespace AmsHighAvailability.Entities
             Attempts.Add((stampId, attemptId));
             Entity.Current.SignalEntity<IJobRunAttempt>(attemptEntityId, proxy => proxy.Start((InputData, stampId)));
             _log.LogInformation("Requested job attempt to start. JobId={JobId}, JobAttemptId={JobAttemptId}, StampId={StampId}", JobId, attemptId, stampId);
-            return false;
+            return true;
         }
 
         private string SelectStampIdForAttempt()
