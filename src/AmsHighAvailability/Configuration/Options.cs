@@ -19,12 +19,15 @@ namespace AmsHighAvailability.Configuration
         {
             var stampConfiguration = new StampConfiguration
             {
-                MediaServicesEndpointUrl = Environment.GetEnvironmentVariable($"Options:Stamps:{stampId}:MediaServicesEndpointUrl"),
-                MediaServicesKey = Environment.GetEnvironmentVariable($"Options:Stamps:{stampId}:MediaServicesKey"),
+                MediaServicesSubscriptionId = Environment.GetEnvironmentVariable($"Options:Stamps:{stampId}:MediaServicesSubscriptionId"),
+                MediaServicesResourceGroupName = Environment.GetEnvironmentVariable($"Options:Stamps:{stampId}:MediaServicesResourceGroupName"),
+                MediaServicesInstanceName = Environment.GetEnvironmentVariable($"Options:Stamps:{stampId}:MediaServicesInstanceName"),
                 StampId = stampId
             };
 
-            return stampConfiguration.MediaServicesEndpointUrl == null && stampConfiguration.MediaServicesKey == null ? null : stampConfiguration;
+            return (stampConfiguration.MediaServicesSubscriptionId == null && stampConfiguration.MediaServicesResourceGroupName == null && stampConfiguration.MediaServicesInstanceName == null)
+                ? null 
+                : stampConfiguration;
         }
     }
 }

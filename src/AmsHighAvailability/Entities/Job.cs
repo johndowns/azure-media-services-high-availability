@@ -13,7 +13,7 @@ namespace AmsHighAvailability.Entities
 {
     public interface IJob
     {
-        void Start(string inputData);
+        void Start(string inputMediaFileUrl);
 
         void MarkAttemptAsSucceeded(string jobRunAttemptId);
 
@@ -30,8 +30,8 @@ namespace AmsHighAvailability.Entities
         [JsonProperty("jobId")]
         public string JobId { get; set; }
 
-        [JsonProperty("inputData")]
-        public string InputData { get; set; } // URL or whatever is needed (TODO)
+        [JsonProperty("inputMediaFileUrl")]
+        public string InputMediaFileUrl { get; set; }
 
         [JsonProperty("submittedTime")]
         public DateTimeOffset SubmittedTime { get; set; }
@@ -65,12 +65,12 @@ namespace AmsHighAvailability.Entities
         public static Task Run([EntityTrigger] IDurableEntityContext ctx, ILogger log)
             => ctx.DispatchAsync<Job>(log);
 
-        public void Start(string inputData)
+        public void Start(string inputMediaFileUrl)
         {
             JobId = Entity.Current.EntityKey;
-            InputData = inputData;
+            InputMediaFileUrl = inputMediaFileUrl;
 
-            _log.LogInformation("Started job. JobId={JobId}", JobId);
+            _log.LogInformation("Started job. JobId={JobId}, InputMediaFileUrl={InputMediaFileUrl}", JobId, InputMediaFileUrl);
 
             // Start a new attempt.
             var attemptStarted = StartAttempt();
@@ -138,7 +138,7 @@ namespace AmsHighAvailability.Entities
             var attemptId = $"{JobId}|{Guid.NewGuid()}";
             var attemptEntityId = new EntityId(nameof(JobRunAttempt), attemptId);
             Attempts.Add((stampId, attemptId));
-            Entity.Current.SignalEntity<IJobRunAttempt>(attemptEntityId, proxy => proxy.Start((InputData, stampId)));
+            Entity.Current.SignalEntity<IJobRunAttempt>(attemptEntityId, proxy => proxy.Start((InputMediaFileUrl, stampId)));
             _log.LogInformation("Requested job attempt to start. JobId={JobId}, JobAttemptId={JobAttemptId}, StampId={StampId}", JobId, attemptId, stampId);
             return true;
         }

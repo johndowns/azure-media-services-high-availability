@@ -19,10 +19,10 @@ namespace AmsHighAvailability
             ILogger log)
         {
             var jobId = Guid.NewGuid().ToString();
-            var inputData = "TODO-inputdata";
+            var inputMediaFileUrl = "https://nimbuscdn-nimbuspm.streaming.mediaservices.windows.net/2b533311-b215-4409-80af-529c3e853622/Ignite-short.mp4";
             var entityId = new EntityId(nameof(Job), jobId);
 
-            await durableEntityClient.SignalEntityAsync<IJob>(entityId, proxy => proxy.Start(inputData));
+            await durableEntityClient.SignalEntityAsync<IJob>(entityId, proxy => proxy.Start(inputMediaFileUrl));
 
             log.LogInformation("Initiated job. JobId={JobId}", jobId);
 

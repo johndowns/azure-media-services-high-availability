@@ -1,4 +1,5 @@
 ﻿using AmsHighAvailability.Models;
+using AmsHighAvailability.Services;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,7 @@ namespace AmsHighAvailability.Entities
 {
     public interface IJobRunAttempt
     {
-        void Start((string inputData, string stampId) arguments);
+        Task Start((string inputMediaFileUrl, string stampId) arguments);
 
         void StatusUpdate((JobRunAttemptStatus newStatus, DateTimeOffset statusTime) arguments);
 
@@ -46,22 +47,26 @@ namespace AmsHighAvailability.Entities
         public DateTimeOffset? LastStatusUpdateReceivedTime { get; set; }
 
         [JsonIgnore]
+        private readonly IMediaServicesJobService _mediaServicesJobService;
+
+        [JsonIgnore]
         private readonly Configuration.Options _settings;
 
         [JsonIgnore]
         private readonly ILogger _log;
 
-        public JobRunAttempt(ILogger log, IOptions<Configuration.Options> options)
+        public JobRunAttempt(ILogger log, IMediaServicesJobService mediaServicesJobService, IOptions<Configuration.Options> options)
         {
-            this._settings = options.Value;
             this._log = log;
+            this._mediaServicesJobService = mediaServicesJobService;
+            this._settings = options.Value;
         }
 
         [FunctionName(nameof(JobRunAttempt))]
         public static Task Run([EntityTrigger] IDurableEntityContext ctx, ILogger log)
             => ctx.DispatchAsync<JobRunAttempt>(log);
 
-        public void Start((string inputData, string stampId) arguments)
+        public async Task Start((string inputMediaFileUrl, string stampId) arguments)
         {
             // Set up the internal metadata.
             JobRunAttemptId = Entity.Current.EntityKey;
@@ -72,13 +77,27 @@ namespace AmsHighAvailability.Entities
             CurrentStatus = JobRunAttemptStatus.Received;
             LastStatusUpdateReceivedTime = null;
 
-            // Submit the job for processing.
-            // TODO submit job to AMS
-            CurrentStatus = JobRunAttemptStatus.Processing;
-            _log.LogInformation("Started job run attempt. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, StampId={StampId}", JobRunAttemptId, JobId, StampId);
+            // Find the details of the stamp that will be used for this job run attempt.
+            var stampSettings = _settings.GetStampConfiguration(StampId);
 
-            // Make a note to ourselves to check for a status update timeout.
-            ScheduleNextStatusTimeoutCheck();
+            // Submit the job for processing.
+            var isSubmittedSuccessfully = await _mediaServicesJobService.SubmitJobToMediaServicesEndpointAsync(
+                stampSettings.MediaServicesSubscriptionId, stampSettings.MediaServicesResourceGroupName, stampSettings.MediaServicesInstanceName,
+                arguments.inputMediaFileUrl, JobId, JobId);
+            if (isSubmittedSuccessfully)
+            {
+                CurrentStatus = JobRunAttemptStatus.Processing;
+                _log.LogInformation("Successfully submitted job run attempt to Azure Media Services. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, StampId={StampId}", JobRunAttemptId, JobId, StampId);
+
+                // Make a note to ourselves to check for a status update timeout.
+                ScheduleNextStatusTimeoutCheck();
+            }
+            else
+            {
+                CurrentStatus = JobRunAttemptStatus.Failed;
+                _log.LogInformation("Failed to start job run attempt. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, StampId={StampId}", JobRunAttemptId, JobId, StampId);
+                UpdateJobStatus(CurrentStatus);
+            }
         }
 
         public void StatusUpdate((JobRunAttemptStatus newStatus, DateTimeOffset statusTime) arguments)
@@ -115,7 +134,7 @@ namespace AmsHighAvailability.Entities
             }
         }
 
-        private void UpdateJobStatus(JobRunAttemptStatus newStatus)
+        private void UpdateJobStatus(JobRunAttemptStatus newStatus) // TODO can this be called implicitly? And odes it need an argument?
         {
             _log.LogInformation("Job run attempt is updating job status. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, NewStatus={newStatus}", JobRunAttemptId, JobId, newStatus);
 

@@ -1,4 +1,5 @@
-﻿using Microsoft.Azure.Functions.Extensions.DependencyInjection;
+﻿using AmsHighAvailability.Services;
+using Microsoft.Azure.Functions.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -17,6 +18,7 @@ namespace AmsHighAvailability
             {
                 return new Random();
             });
+            builder.Services.AddScoped<IMediaServicesJobService, MediaServicesJobService>();
 
             builder.Services.AddOptions<Configuration.Options>()
                 .Configure<IConfiguration>((settings, configuration) =>

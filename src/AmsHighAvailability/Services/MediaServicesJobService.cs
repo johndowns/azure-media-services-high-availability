@@ -7,7 +7,14 @@ using Microsoft.Rest;
 
 namespace AmsHighAvailability.Services
 {
-    public class MediaServicesJobService
+    public interface IMediaServicesJobService
+    {
+        Task<bool> SubmitJobToMediaServicesEndpointAsync(
+            string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
+            string inputMediaUrl, string jobName, string outputAssetName);
+    }
+
+    public class MediaServicesJobService : IMediaServicesJobService
     {
         // The implementation in this class is based on this example:
         // https://github.com/Azure-Samples/media-services-v3-dotnet-quickstarts/tree/master/AMSV3Quickstarts/EncodeAndStreamFiles
