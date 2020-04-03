@@ -13,8 +13,8 @@ namespace AmsHighAvailability
 {
     public class EventGridFunctions
     {
-        [FunctionName("EventGridFunctions")]
-        public async Task Run(
+        [FunctionName("AmsStatusUpdate")]
+        public async Task AmsStatusUpdate(
             [EventGridTrigger]EventGridEvent eventGridEvent,
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
