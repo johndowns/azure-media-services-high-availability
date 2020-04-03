@@ -1,9 +1,11 @@
 ﻿using AmsHighAvailability.Models;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 
 namespace AmsHighAvailability.Entities
@@ -14,7 +16,7 @@ namespace AmsHighAvailability.Entities
 
         void StatusUpdate((string newStatus, DateTimeOffset statusTime) arguments);
 
-        void StatusTimeout();
+        void CheckForStatusTimeout();
     }
 
     [JsonObject(MemberSerialization.OptIn)]
@@ -44,14 +46,18 @@ namespace AmsHighAvailability.Entities
         [JsonIgnore]
         private readonly Configuration.Options _settings;
 
-        public JobRunAttempt(IOptions<Configuration.Options> options)
+        [JsonIgnore]
+        private readonly ILogger _log;
+
+        public JobRunAttempt(ILogger log, IOptions<Configuration.Options> options)
         {
             this._settings = options.Value;
+            this._log = log;
         }
 
         [FunctionName(nameof(JobRunAttempt))]
-        public static Task Run([EntityTrigger] IDurableEntityContext ctx)
-            => ctx.DispatchAsync<JobRunAttempt>();
+        public static Task Run([EntityTrigger] IDurableEntityContext ctx, ILogger log)
+            => ctx.DispatchAsync<JobRunAttempt>(log);
 
         public void Start((string inputData, string stampId) arguments)
         {
@@ -67,6 +73,7 @@ namespace AmsHighAvailability.Entities
             // Submit the job for processing.
             // TODO submit job to AMS
             Status = JobRunAttemptStatus.Processing;
+            _log.LogInformation("Started job run attempt. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, StampId={StampId}", JobRunAttemptId, JobId, StampId);
 
             // Make a note to ourselves to check for a status update timeout.
             ScheduleStatusTimeout();
@@ -74,6 +81,8 @@ namespace AmsHighAvailability.Entities
 
         public void StatusUpdate((string newStatus, DateTimeOffset statusTime) arguments)
         {
+            _log.LogInformation("Received status update for job run attempt. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, Time={StatusTime}, JobRunAttemptStatus={JobRunAttemptStatus}", JobRunAttemptId, JobId, arguments.statusTime, arguments.newStatus);
+
             LastStatusUpdateReceivedTime = arguments.statusTime;
 
             switch (arguments.newStatus)
@@ -91,8 +100,10 @@ namespace AmsHighAvailability.Entities
             }
         }
 
-        public void StatusTimeout()
+        public void CheckForStatusTimeout()
         {
+            _log.LogInformation("Checking for status timeout on job run attempt. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, LastStatusUpdateReceivedTime={lastStatusUpdateReceivedTime}", JobRunAttemptId, JobId, LastStatusUpdateReceivedTime);
+
             if (Status != JobRunAttemptStatus.Processing)
             {
                 // We don't need to time out if the job isn't actively processing.
@@ -109,6 +120,8 @@ namespace AmsHighAvailability.Entities
 
         private void UpdateJobStatus(JobRunAttemptStatus newStatus)
         {
+            _log.LogInformation("Job run attempt is updating job status. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, NewStatus={newStatus}", JobRunAttemptId, JobId, newStatus);
+
             Status = newStatus;
 
             // Signal the job that we have an update.
@@ -137,7 +150,10 @@ namespace AmsHighAvailability.Entities
         private void ScheduleStatusTimeout()
         {
             var statusTimeoutTimeUtc = DateTime.UtcNow.AddMinutes(10); // TODO
-            Entity.Current.SignalEntity<IJobRunAttempt>(Entity.Current.EntityId, statusTimeoutTimeUtc, proxy => proxy.StatusTimeout());
+
+            _log.LogInformation("Scheduling job run attempt for a status timeout check. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, CheckTime={CheckTime}", JobRunAttemptId, JobId, statusTimeoutTimeUtc);
+
+            Entity.Current.SignalEntity<IJobRunAttempt>(Entity.Current.EntityId, statusTimeoutTimeUtc, proxy => proxy.CheckForStatusTimeout());
         }
     }
 }

@@ -24,6 +24,8 @@ namespace AmsHighAvailability
 
             await durableEntityClient.SignalEntityAsync<IJob>(entityId, proxy => proxy.Start(inputData));
 
+            log.LogInformation("Started job. JobId={JobId}", jobId);
+
             return new OkResult();
         }
     }

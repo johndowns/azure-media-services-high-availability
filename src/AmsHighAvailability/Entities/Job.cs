@@ -1,6 +1,7 @@
 ﻿using AmsHighAvailability.Models;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System;
@@ -50,20 +51,26 @@ namespace AmsHighAvailability.Entities
         [JsonIgnore]
         private readonly Random _random;
 
-        public Job(IOptions<Configuration.Options> options, Random random)
+        [JsonIgnore]
+        private readonly ILogger _log;
+
+        public Job(ILogger log, IOptions<Configuration.Options> options, Random random)
         {
             this._settings = options.Value;
             this._random = random;
+            this._log = log;
         }
 
         [FunctionName(nameof(Job))]
-        public static Task Run([EntityTrigger] IDurableEntityContext ctx)
-            => ctx.DispatchAsync<Job>();
+        public static Task Run([EntityTrigger] IDurableEntityContext ctx, ILogger log)
+            => ctx.DispatchAsync<Job>(log);
 
         public void Start(string inputData)
         {
             JobId = Entity.Current.EntityKey;
             InputData = inputData;
+
+            _log.LogInformation("Started job. JobId={JobId}", JobId);
 
             // Start a new attempt.
             StartAttempt();
@@ -94,6 +101,7 @@ namespace AmsHighAvailability.Entities
             var stampId = SelectStampIdForAttempt();
             if (stampId == null)
             {
+                _log.LogWarning("Cannot start any further job attempts since no stamps are available. JobId={JobId}", JobId);
                 // TODO consider the job to have failed.
             }
 
@@ -102,6 +110,7 @@ namespace AmsHighAvailability.Entities
             var attemptEntityId = new EntityId(nameof(JobRunAttempt), attemptId);
             Attempts.Add((stampId, attemptId));
             Entity.Current.SignalEntity<IJobRunAttempt>(attemptEntityId, proxy => proxy.Start((InputData, stampId)));
+            _log.LogWarning("Requested job attempt to start. JobId={JobId}, JobAttemptId={JobAttemptId}, StampId={StampId}", JobId, attemptId, stampId);
         }
 
         private string SelectStampIdForAttempt()
