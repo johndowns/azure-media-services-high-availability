@@ -73,36 +73,65 @@ namespace AmsHighAvailability.Entities
             _log.LogInformation("Started job. JobId={JobId}", JobId);
 
             // Start a new attempt.
-            StartAttempt();
+            var attemptStarted = StartAttempt();
+            if (! attemptStarted)
+            {
+                UpdateJobStatus(JobStatus.Failed);
+            }
+        }
+
+        private void UpdateJobStatus(JobStatus newJobStatus) // TODO handle the fact that an attempt might have come back with a success
+        {
+            Status = newJobStatus;
+            _log.LogInformation("Job has completed. JobId={JobId}, Status={JobStatus}", JobId, Status);
         }
 
         public void MarkAttemptAsSucceeded(string jobRunAttemptId)
         {
-            // TODO stop.
+            _log.LogInformation("Job run attempt has succeeded. JobId={JobId}, JobRunAttemptId={JobRunAttemptId}", JobId, jobRunAttemptId);
+            UpdateJobStatus(JobStatus.Succeeded);
         }
 
         public void MarkAttemptAsCanceled(string jobRunAttemptId)
         {
-            // TODO start a new attempt on a different stamp.
+            _log.LogInformation("Job run attempt has been canceled. JobId={JobId}, JobRunAttemptId={JobRunAttemptId}", JobId, jobRunAttemptId);
+
+            var newAttemptStarted = StartAttempt();
+            if (!newAttemptStarted)
+            {
+                UpdateJobStatus(JobStatus.Failed);
+            }
         }
 
         public void MarkAttemptAsFailed(string jobRunAttemptId)
         {
-            // TODO start a new attempt on a different stamp.
+            _log.LogInformation("Job run attempt has failed. JobId={JobId}, JobRunAttemptId={JobRunAttemptId}", JobId, jobRunAttemptId);
+
+            var newAttemptStarted = StartAttempt();
+            if (!newAttemptStarted)
+            {
+                UpdateJobStatus(JobStatus.Failed);
+            }
         }
 
         public void MarkAttemptAsTimedOut(string jobRunAttemptId)
         {
-            // TODO start a new attempt on a different stamp.
+            _log.LogInformation("Job run attempt has timed out. JobId={JobId}, JobRunAttemptId={JobRunAttemptId}", JobId, jobRunAttemptId);
+
+            var newAttemptStarted = StartAttempt();
+            if (!newAttemptStarted)
+            {
+                UpdateJobStatus(JobStatus.Failed);
+            }
         }
 
-        private void StartAttempt()
+        private bool StartAttempt()
         {
             var stampId = SelectStampIdForAttempt();
             if (stampId == null)
             {
                 _log.LogWarning("Cannot start any further job attempts since no stamps are available. JobId={JobId}", JobId);
-                // TODO consider the job to have failed.
+                return false;
             }
 
             // Start the attempt on the selected stamp.
@@ -110,7 +139,8 @@ namespace AmsHighAvailability.Entities
             var attemptEntityId = new EntityId(nameof(JobRunAttempt), attemptId);
             Attempts.Add((stampId, attemptId));
             Entity.Current.SignalEntity<IJobRunAttempt>(attemptEntityId, proxy => proxy.Start((InputData, stampId)));
-            _log.LogWarning("Requested job attempt to start. JobId={JobId}, JobAttemptId={JobAttemptId}, StampId={StampId}", JobId, attemptId, stampId);
+            _log.LogInformation("Requested job attempt to start. JobId={JobId}, JobAttemptId={JobAttemptId}, StampId={StampId}", JobId, attemptId, stampId);
+            return false;
         }
 
         private string SelectStampIdForAttempt()
