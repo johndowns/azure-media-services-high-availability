@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System;
-using System.Security.Cryptography;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace AmsHighAvailability.Entities
@@ -14,7 +14,7 @@ namespace AmsHighAvailability.Entities
     {
         void Start((string inputData, string stampId) arguments);
 
-        void StatusUpdate((string newStatus, DateTimeOffset statusTime) arguments);
+        void StatusUpdate((JobRunAttemptStatus newStatus, DateTimeOffset statusTime) arguments);
 
         void CheckForStatusTimeout();
     }
@@ -38,7 +38,9 @@ namespace AmsHighAvailability.Entities
         public DateTimeOffset? CompletedTime { get; set; }
 
         [JsonProperty("status")]
-        public JobRunAttemptStatus Status { get; set; }
+        public JobRunAttemptStatus CurrentStatus { get; set; }
+
+        public HashSet<JobRunAttemptStatusHistory> StatusHistory { get; set; } = new HashSet<JobRunAttemptStatusHistory>();
 
         [JsonProperty("lastStatusUpdateReceivedTime")]
         public DateTimeOffset? LastStatusUpdateReceivedTime { get; set; }
@@ -67,44 +69,39 @@ namespace AmsHighAvailability.Entities
             StampId = arguments.stampId;
             SubmittedTime = DateTime.UtcNow;
             CompletedTime = null;
-            Status = JobRunAttemptStatus.Received;
+            CurrentStatus = JobRunAttemptStatus.Received;
             LastStatusUpdateReceivedTime = null;
 
             // Submit the job for processing.
             // TODO submit job to AMS
-            Status = JobRunAttemptStatus.Processing;
+            CurrentStatus = JobRunAttemptStatus.Processing;
             _log.LogInformation("Started job run attempt. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, StampId={StampId}", JobRunAttemptId, JobId, StampId);
 
             // Make a note to ourselves to check for a status update timeout.
-            ScheduleStatusTimeout();
+            ScheduleNextStatusTimeoutCheck();
         }
 
-        public void StatusUpdate((string newStatus, DateTimeOffset statusTime) arguments)
+        public void StatusUpdate((JobRunAttemptStatus newStatus, DateTimeOffset statusTime) arguments)
         {
             _log.LogInformation("Received status update for job run attempt. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, Time={StatusTime}, JobRunAttemptStatus={JobRunAttemptStatus}", JobRunAttemptId, JobId, arguments.statusTime, arguments.newStatus);
 
             LastStatusUpdateReceivedTime = arguments.statusTime;
+            CurrentStatus = arguments.newStatus;
+            StatusHistory.Add(new JobRunAttemptStatusHistory { Status = arguments.newStatus, Timestamp = arguments.statusTime });
 
-            switch (arguments.newStatus)
+            if (CurrentStatus == JobRunAttemptStatus.Processing)
             {
-                case "InProgress":
-                    UpdateJobStatus(JobRunAttemptStatus.Processing);
-                    ScheduleStatusTimeout();
-                    break;
-                case "Done":
-                    UpdateJobStatus(JobRunAttemptStatus.Succeeded);
-                    break;
-                case "Failed":
-                    UpdateJobStatus(JobRunAttemptStatus.Failed);
-                    break;
+                ScheduleNextStatusTimeoutCheck();
             }
+
+            UpdateJobStatus(CurrentStatus);
         }
 
         public void CheckForStatusTimeout()
         {
             _log.LogInformation("Checking for status timeout on job run attempt. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, LastStatusUpdateReceivedTime={lastStatusUpdateReceivedTime}", JobRunAttemptId, JobId, LastStatusUpdateReceivedTime);
 
-            if (Status != JobRunAttemptStatus.Processing)
+            if (CurrentStatus != JobRunAttemptStatus.Processing)
             {
                 // We don't need to time out if the job isn't actively processing.
                 return;
@@ -121,8 +118,6 @@ namespace AmsHighAvailability.Entities
         private void UpdateJobStatus(JobRunAttemptStatus newStatus)
         {
             _log.LogInformation("Job run attempt is updating job status. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, NewStatus={newStatus}", JobRunAttemptId, JobId, newStatus);
-
-            Status = newStatus;
 
             // Signal the job that we have an update.
             switch (newStatus)
@@ -147,13 +142,12 @@ namespace AmsHighAvailability.Entities
             }
         }
 
-        private void ScheduleStatusTimeout()
+        private void ScheduleNextStatusTimeoutCheck()
         {
             var statusTimeoutTimeUtc = DateTime.UtcNow.Add(_settings.JobRunAttemptStatusTimeoutCheckInterval);
-
-            _log.LogInformation("Scheduling job run attempt for a status timeout check. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, CheckTime={CheckTime}", JobRunAttemptId, JobId, statusTimeoutTimeUtc);
-
             Entity.Current.SignalEntity<IJobRunAttempt>(Entity.Current.EntityId, statusTimeoutTimeUtc, proxy => proxy.CheckForStatusTimeout());
+
+            _log.LogInformation("Scheduled job run attempt for a status timeout check. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, CheckTime={CheckTime}", JobRunAttemptId, JobId, statusTimeoutTimeUtc);
         }
     }
 }
