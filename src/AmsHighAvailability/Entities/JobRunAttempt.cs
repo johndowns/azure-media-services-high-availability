@@ -110,7 +110,7 @@ namespace AmsHighAvailability.Entities
                 return;
             }
 
-            if (LastStatusUpdateReceivedTime == null || LastStatusUpdateReceivedTime < DateTime.UtcNow.AddMinutes(-60))
+            if (LastStatusUpdateReceivedTime == null || LastStatusUpdateReceivedTime < DateTime.UtcNow.Subtract(_settings.JobRunAttemptTimeoutThreshold))
             {
                 // The last time we received a status update was more than 60 minutes ago.
                 // This means we consider the job to have timed out.
@@ -149,7 +149,7 @@ namespace AmsHighAvailability.Entities
 
         private void ScheduleStatusTimeout()
         {
-            var statusTimeoutTimeUtc = DateTime.UtcNow.AddMinutes(10); // TODO
+            var statusTimeoutTimeUtc = DateTime.UtcNow.Add(_settings.JobRunAttemptStatusTimeoutCheckInterval);
 
             _log.LogInformation("Scheduling job run attempt for a status timeout check. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, CheckTime={CheckTime}", JobRunAttemptId, JobId, statusTimeoutTimeUtc);
 
