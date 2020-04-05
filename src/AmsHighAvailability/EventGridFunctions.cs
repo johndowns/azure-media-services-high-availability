@@ -30,7 +30,7 @@ namespace AmsHighAvailability
             var jobRunAttemptId = GetJobRunAttemptIdFromEventSubject(eventGridEvent.Subject);
             var statusTime = eventGridEvent.EventTime;
 
-            if (eventGridEvent.EventType != "Microsoft.Media.JobStateChange") return;
+            if (eventGridEvent.EventType != "Microsoft.Media.JobStateChange") return; // TODO handle Microsoft.Media.JobOutputStateChange events - looking for any forward progress
 
             // Map the event state to the job run attempt status.
             string eventState = Convert.ToString(((dynamic)eventGridEvent.Data).state);
@@ -76,7 +76,7 @@ namespace AmsHighAvailability
             ILogger log)
         {
             var jobRunAttemptId = req.Query["jobRunAttemptId"].ToString();
-            var status = JobRunAttemptStatus.Processing;
+            var status = Enum.Parse<JobRunAttemptStatus>(req.Query["status"]);
 
             await SendStatusUpdate(durableEntityClient, jobRunAttemptId, status, DateTime.UtcNow);
 

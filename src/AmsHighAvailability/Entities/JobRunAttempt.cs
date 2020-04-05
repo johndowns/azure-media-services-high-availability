@@ -103,9 +103,9 @@ namespace AmsHighAvailability.Entities
         public void StatusUpdate((JobRunAttemptStatus newStatus, DateTimeOffset statusTime) arguments)
         {
             _log.LogInformation("Received status update for job run attempt. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, Time={StatusTime}, JobRunAttemptStatus={JobRunAttemptStatus}", JobRunAttemptId, JobId, arguments.statusTime, arguments.newStatus);
-
             StatusHistory.Add(new JobRunAttemptStatusHistory { Status = arguments.newStatus, StatusTime = arguments.statusTime, TimeReceived = DateTimeOffset.Now });
 
+            // If this status update is more recent than the previous one, mark it as the current status and update the job accordingly.
             if (LastStatusUpdateReceivedTime == null || arguments.statusTime > LastStatusUpdateReceivedTime)
             {
                 LastStatusUpdateReceivedTime = arguments.statusTime;
@@ -114,6 +114,7 @@ namespace AmsHighAvailability.Entities
                 UpdateJobStatus(CurrentStatus);
             }
 
+            // If the attempt is still processing, make sure we schedule a timeout check.
             if (CurrentStatus == JobRunAttemptStatus.Processing)
             {
                 ScheduleNextStatusTimeoutCheck();
@@ -127,6 +128,7 @@ namespace AmsHighAvailability.Entities
             if (CurrentStatus != JobRunAttemptStatus.Processing)
             {
                 // We don't need to time out if the job isn't actively processing.
+                _log.LogInformation("Attempt is no longer processing so no further status updates are needed. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, LastStatusUpdateReceivedTime={lastStatusUpdateReceivedTime}", JobRunAttemptId, JobId, LastStatusUpdateReceivedTime);
                 return;
             }
 
@@ -146,22 +148,14 @@ namespace AmsHighAvailability.Entities
             switch (newStatus)
             {
                 case JobRunAttemptStatus.TimedOut:
-                    {
-                        Entity.Current.SignalEntity<IJob>(new EntityId(nameof(Job), JobId), proxy => proxy.MarkAttemptAsTimedOut(JobRunAttemptId));
-                        break;
-                    }
-
+                    Entity.Current.SignalEntity<IJob>(new EntityId(nameof(Job), JobId), proxy => proxy.MarkAttemptAsTimedOut(JobRunAttemptId));
+                    break;
                 case JobRunAttemptStatus.Succeeded:
-                    {
-                        Entity.Current.SignalEntity<IJob>(new EntityId(nameof(Job), JobId), proxy => proxy.MarkAttemptAsSucceeded(JobRunAttemptId));
-                        break;
-                    }
-
+                    Entity.Current.SignalEntity<IJob>(new EntityId(nameof(Job), JobId), proxy => proxy.MarkAttemptAsSucceeded(JobRunAttemptId));
+                    break;
                 case JobRunAttemptStatus.Failed:
-                    {
-                        Entity.Current.SignalEntity<IJob>(new EntityId(nameof(Job), JobId), proxy => proxy.MarkAttemptAsFailed(JobRunAttemptId));
-                        break;
-                    }
+                    Entity.Current.SignalEntity<IJob>(new EntityId(nameof(Job), JobId), proxy => proxy.MarkAttemptAsFailed(JobRunAttemptId));
+                    break;
             }
         }
 
