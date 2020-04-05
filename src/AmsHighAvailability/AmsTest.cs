@@ -17,12 +17,10 @@ namespace AmsHighAvailability
             [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
             ILogger log)
         {
-            // TODO these should be in config settings
             var subscriptionId = "d178c7c4-ffb7-467e-a397-042c1d428092";
             var resourceGroupName = "AmsJob";
             var mediaServicesInstanceName = "jdamsncus";
 
-            // TODO these should be arguments
             var inputMediaUrl = "https://nimbuscdn-nimbuspm.streaming.mediaservices.windows.net/2b533311-b215-4409-80af-529c3e853622/Ignite-short.mp4";
             var jobName = Guid.NewGuid().ToString();
             var outputAssetName = jobName;

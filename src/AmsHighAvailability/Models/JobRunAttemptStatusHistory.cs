@@ -6,7 +6,8 @@ namespace AmsHighAvailability.Models
 {
     public class JobRunAttemptStatusHistory
     {
-        public DateTimeOffset Timestamp { get; set; }
+        public DateTimeOffset StatusTime { get; set; }
         public JobRunAttemptStatus Status { get; set; }
+        public DateTimeOffset TimeReceived { get; set; }
     }
 }

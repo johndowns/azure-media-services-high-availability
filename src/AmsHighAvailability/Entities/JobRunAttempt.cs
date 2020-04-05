@@ -83,7 +83,7 @@ namespace AmsHighAvailability.Entities
             // Submit the job for processing.
             var isSubmittedSuccessfully = await _mediaServicesJobService.SubmitJobToMediaServicesEndpointAsync(
                 stampSettings.MediaServicesSubscriptionId, stampSettings.MediaServicesResourceGroupName, stampSettings.MediaServicesInstanceName,
-                arguments.inputMediaFileUrl, JobId, JobId);
+                arguments.inputMediaFileUrl, JobRunAttemptId, JobRunAttemptId);
             if (isSubmittedSuccessfully)
             {
                 CurrentStatus = JobRunAttemptStatus.Processing;
@@ -104,16 +104,20 @@ namespace AmsHighAvailability.Entities
         {
             _log.LogInformation("Received status update for job run attempt. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, Time={StatusTime}, JobRunAttemptStatus={JobRunAttemptStatus}", JobRunAttemptId, JobId, arguments.statusTime, arguments.newStatus);
 
-            LastStatusUpdateReceivedTime = arguments.statusTime;
-            CurrentStatus = arguments.newStatus;
-            StatusHistory.Add(new JobRunAttemptStatusHistory { Status = arguments.newStatus, Timestamp = arguments.statusTime });
+            StatusHistory.Add(new JobRunAttemptStatusHistory { Status = arguments.newStatus, StatusTime = arguments.statusTime, TimeReceived = DateTimeOffset.Now });
+
+            if (LastStatusUpdateReceivedTime == null || arguments.statusTime > LastStatusUpdateReceivedTime)
+            {
+                LastStatusUpdateReceivedTime = arguments.statusTime;
+                CurrentStatus = arguments.newStatus;
+
+                UpdateJobStatus(CurrentStatus);
+            }
 
             if (CurrentStatus == JobRunAttemptStatus.Processing)
             {
                 ScheduleNextStatusTimeoutCheck();
             }
-
-            UpdateJobStatus(CurrentStatus);
         }
 
         public void CheckForStatusTimeout()
@@ -163,6 +167,12 @@ namespace AmsHighAvailability.Entities
 
         private void ScheduleNextStatusTimeoutCheck()
         {
+            if (CurrentStatus == JobRunAttemptStatus.Succeeded || CurrentStatus== JobRunAttemptStatus.Failed || CurrentStatus == JobRunAttemptStatus.TimedOut)
+            {
+                _log.LogInformation("Skipped scheduling a new status check since attempt status is terminal. JobId={JobId}, JobRunAttemptId={JobRunAttemptId}, CurrentStatus={CurrentStatus}", JobId, JobRunAttemptId, CurrentStatus);
+                return;
+            }
+
             var statusTimeoutTimeUtc = DateTime.UtcNow.Add(_settings.JobRunAttemptStatusTimeoutCheckInterval);
             Entity.Current.SignalEntity<IJobRunAttempt>(Entity.Current.EntityId, statusTimeoutTimeUtc, proxy => proxy.CheckForStatusTimeout());
 
