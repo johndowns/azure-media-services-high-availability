@@ -15,7 +15,7 @@ namespace AmsHighAvailability.Entities
     {
         Task Start((string inputMediaFileUrl, string stampId) arguments);
 
-        void StatusUpdate((JobRunAttemptStatus newStatus, DateTimeOffset statusTime) arguments);
+        void StatusUpdate((AmsStatus newStatus, DateTimeOffset statusTime) arguments);
 
         void CheckForStatusTimeout();
     }
@@ -39,7 +39,7 @@ namespace AmsHighAvailability.Entities
         public DateTimeOffset? CompletedTime { get; set; }
 
         [JsonProperty("status")]
-        public JobRunAttemptStatus CurrentStatus { get; set; }
+        public AmsStatus CurrentStatus { get; set; }
 
         public HashSet<JobRunAttemptStatusHistory> StatusHistory { get; set; } = new HashSet<JobRunAttemptStatusHistory>();
 
@@ -74,19 +74,29 @@ namespace AmsHighAvailability.Entities
             StampId = arguments.stampId;
             SubmittedTime = DateTime.UtcNow;
             CompletedTime = null;
-            CurrentStatus = JobRunAttemptStatus.Received;
+            CurrentStatus = AmsStatus.Received;
             LastStatusUpdateReceivedTime = null;
 
             // Find the details of the stamp that will be used for this job run attempt.
             var stampSettings = _settings.GetStampConfiguration(StampId);
 
             // Submit the job for processing.
-            var isSubmittedSuccessfully = await _mediaServicesJobService.SubmitJobToMediaServicesEndpointAsync(
+            var (isSubmittedSuccessfully, outputAssetIds) = await _mediaServicesJobService.SubmitJobToMediaServicesEndpointAsync(
                 stampSettings.MediaServicesSubscriptionId, stampSettings.MediaServicesResourceGroupName, stampSettings.MediaServicesInstanceName,
-                arguments.inputMediaFileUrl, JobRunAttemptId, JobRunAttemptId);
+                arguments.inputMediaFileUrl,
+                JobRunAttemptId);
+
+            // Set up entities for tracking the output status.
+            foreach (var outputAssetId in outputAssetIds)
+            {
+                var outputEntityId = new EntityId(nameof(JobRunAttemptOutput), outputAssetId);
+                Entity.Current.SignalEntity<IJobRunAttemptOutput>(outputEntityId, proxy => proxy.Start());
+            }
+
+            // Update this entity's status.
             if (isSubmittedSuccessfully)
             {
-                CurrentStatus = JobRunAttemptStatus.Processing;
+                CurrentStatus = AmsStatus.Processing;
                 _log.LogInformation("Successfully submitted job run attempt to Azure Media Services. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, StampId={StampId}", JobRunAttemptId, JobId, StampId);
 
                 // Make a note to ourselves to check for a status update timeout.
@@ -94,18 +104,18 @@ namespace AmsHighAvailability.Entities
             }
             else
             {
-                CurrentStatus = JobRunAttemptStatus.Failed;
+                CurrentStatus = AmsStatus.Failed;
                 _log.LogInformation("Failed to start job run attempt. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, StampId={StampId}", JobRunAttemptId, JobId, StampId);
                 UpdateJobStatus(CurrentStatus);
             }
         }
 
-        public void StatusUpdate((JobRunAttemptStatus newStatus, DateTimeOffset statusTime) arguments)
+        public void StatusUpdate((AmsStatus newStatus, DateTimeOffset statusTime) arguments)
         {
             _log.LogInformation("Received status update for job run attempt. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, Time={StatusTime}, JobRunAttemptStatus={JobRunAttemptStatus}", JobRunAttemptId, JobId, arguments.statusTime, arguments.newStatus);
             StatusHistory.Add(new JobRunAttemptStatusHistory { Status = arguments.newStatus, StatusTime = arguments.statusTime, TimeReceived = DateTimeOffset.Now });
 
-            // If this status update is more recent than the previous one, mark it as the current status and update the job accordingly.
+            // If this status update shows forward progress, we will mark it as the current status and update the job accordingly.
             if (LastStatusUpdateReceivedTime == null || arguments.statusTime > LastStatusUpdateReceivedTime)
             {
                 LastStatusUpdateReceivedTime = arguments.statusTime;
@@ -115,7 +125,7 @@ namespace AmsHighAvailability.Entities
             }
 
             // If the attempt is still processing, make sure we schedule a timeout check.
-            if (CurrentStatus == JobRunAttemptStatus.Processing)
+            if (CurrentStatus == AmsStatus.Processing)
             {
                 ScheduleNextStatusTimeoutCheck();
             }
@@ -125,7 +135,7 @@ namespace AmsHighAvailability.Entities
         {
             _log.LogInformation("Checking for status timeout on job run attempt. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, LastStatusUpdateReceivedTime={lastStatusUpdateReceivedTime}", JobRunAttemptId, JobId, LastStatusUpdateReceivedTime);
 
-            if (CurrentStatus != JobRunAttemptStatus.Processing)
+            if (CurrentStatus != AmsStatus.Processing)
             {
                 // We don't need to time out if the job isn't actively processing.
                 _log.LogInformation("Attempt is no longer processing so no further status updates are needed. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, LastStatusUpdateReceivedTime={lastStatusUpdateReceivedTime}", JobRunAttemptId, JobId, LastStatusUpdateReceivedTime);
@@ -136,24 +146,24 @@ namespace AmsHighAvailability.Entities
             {
                 // The last time we received a status update was more than 60 minutes ago.
                 // This means we consider the job to have timed out.
-                UpdateJobStatus(JobRunAttemptStatus.TimedOut);
+                UpdateJobStatus(AmsStatus.TimedOut);
             }
         }
 
-        private void UpdateJobStatus(JobRunAttemptStatus newStatus) // TODO can this be called implicitly? And odes it need an argument?
+        private void UpdateJobStatus(AmsStatus newStatus) // TODO can this be called implicitly? And odes it need an argument?
         {
             _log.LogInformation("Job run attempt is updating job status. JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, NewStatus={newStatus}", JobRunAttemptId, JobId, newStatus);
 
             // Signal the job that we have an update.
             switch (newStatus)
             {
-                case JobRunAttemptStatus.TimedOut:
+                case AmsStatus.TimedOut:
                     Entity.Current.SignalEntity<IJob>(new EntityId(nameof(Job), JobId), proxy => proxy.MarkAttemptAsTimedOut(JobRunAttemptId));
                     break;
-                case JobRunAttemptStatus.Succeeded:
+                case AmsStatus.Succeeded:
                     Entity.Current.SignalEntity<IJob>(new EntityId(nameof(Job), JobId), proxy => proxy.MarkAttemptAsSucceeded(JobRunAttemptId));
                     break;
-                case JobRunAttemptStatus.Failed:
+                case AmsStatus.Failed:
                     Entity.Current.SignalEntity<IJob>(new EntityId(nameof(Job), JobId), proxy => proxy.MarkAttemptAsFailed(JobRunAttemptId));
                     break;
             }
@@ -161,7 +171,7 @@ namespace AmsHighAvailability.Entities
 
         private void ScheduleNextStatusTimeoutCheck()
         {
-            if (CurrentStatus == JobRunAttemptStatus.Succeeded || CurrentStatus== JobRunAttemptStatus.Failed || CurrentStatus == JobRunAttemptStatus.TimedOut)
+            if (CurrentStatus == AmsStatus.Succeeded || CurrentStatus== AmsStatus.Failed || CurrentStatus == AmsStatus.TimedOut)
             {
                 _log.LogInformation("Skipped scheduling a new status check since attempt status is terminal. JobId={JobId}, JobRunAttemptId={JobRunAttemptId}, CurrentStatus={CurrentStatus}", JobId, JobRunAttemptId, CurrentStatus);
                 return;

@@ -9,56 +9,55 @@ using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using AmsHighAvailability.Entities;
 using System.Threading.Tasks;
 using AmsHighAvailability.Models;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.AspNetCore.Mvc;
 using System.Text.RegularExpressions;
 
 namespace AmsHighAvailability
 {
     public class EventGridFunctions
     {
-        private static Regex EventSubjectRegex = new Regex(@".*\/jobs\/(.*)");
+        private static readonly Regex EventSubjectRegex = new Regex(@".*\/jobs\/(.*)");
 
-        [FunctionName("AmsStatusUpdate")]
-        public async Task AmsStatusUpdate(
+        [FunctionName("AmsJobStatusUpdate")]
+        public async Task AmsJobStatusUpdate(
             [EventGridTrigger]EventGridEvent eventGridEvent,
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
         {
-            log.LogInformation("Received Event Grid event of type {EventGridEventType} for subject {EventGridEventSubject}.", eventGridEvent.EventType, eventGridEvent.Subject);
+            log.LogInformation("Received job status Event Grid event of type {EventGridEventType} for subject {EventGridEventSubject}.", eventGridEvent.EventType, eventGridEvent.Subject);
+            if (eventGridEvent.EventType != "Microsoft.Media.JobStateChange") return;
+
             var jobRunAttemptId = GetJobRunAttemptIdFromEventSubject(eventGridEvent.Subject);
             var statusTime = eventGridEvent.EventTime;
 
-            if (eventGridEvent.EventType != "Microsoft.Media.JobStateChange") return; // TODO handle Microsoft.Media.JobOutputStateChange events - looking for any forward progress
-
             // Map the event state to the job run attempt status.
             string eventState = Convert.ToString(((dynamic)eventGridEvent.Data).state);
-            JobRunAttemptStatus jobRunAttemptStatus;
-            switch (eventState)
-            {
-                case "Queued":
-                case "Scheduled":
-                    // We don't need to listen for status messages where the job has been queued or scheduled.
-                    // We aren't interested until the job actually starts getting processed.
-                    return;
-                case "Processing":
-                    jobRunAttemptStatus = JobRunAttemptStatus.Processing;
-                    break;
-                case "Finished":
-                    jobRunAttemptStatus = JobRunAttemptStatus.Succeeded;
-                    break;
-                case "Error":
-                case "Canceling":
-                case "Canceled":
-                    jobRunAttemptStatus = JobRunAttemptStatus.Failed;
-                    break;
-                default:
-                    throw new InvalidOperationException($"Unexpected value for event state: {eventState}");
-            }
+            var jobRunAttemptStatus = GetAmsStatusFromEventState(eventState);
 
             log.LogInformation("Updating job run attempt status from Event Grid event. JobRunAttemptId={JobRunAttemptId}, JobRunAttemptStatus={JobRunAttemptStatus}, StatusTime={StatusTime}", jobRunAttemptId, jobRunAttemptStatus, statusTime);
-            await SendStatusUpdate(durableEntityClient, jobRunAttemptId, jobRunAttemptStatus, statusTime);
+            var entityId = new EntityId(nameof(JobRunAttempt), jobRunAttemptId);
+            await durableEntityClient.SignalEntityAsync<IJobRunAttempt>(entityId, proxy => proxy.StatusUpdate((jobRunAttemptStatus, statusTime)));
+        }
+
+        [FunctionName("AmsJobOutputStatusUpdate")]
+        public async Task AmsJobOutputStatusUpdate(
+            [EventGridTrigger]EventGridEvent eventGridEvent,
+            [DurableClient]IDurableEntityClient durableEntityClient,
+            ILogger log)
+        {
+            log.LogInformation("Received job output status Event Grid event of type {EventGridEventType} for subject {EventGridEventSubject}.", eventGridEvent.EventType, eventGridEvent.Subject);
+            if (eventGridEvent.EventType != "Microsoft.Media.JobOutputStateChange") return;
+
+            var jobRunAttemptId = GetJobRunAttemptIdFromEventSubject(eventGridEvent.Subject);
+            var statusTime = eventGridEvent.EventTime;
+            
+            // Get the asset name and assemble the job run attempt output ID.
+            string jobRunAttemptOutputId = Convert.ToString(((dynamic)eventGridEvent.Data).output.assetName);
+            AmsStatus jobRunAttemptOutputStatus = GetAmsStatusFromEventState(Convert.ToString(((dynamic)eventGridEvent.Data).output.state));
+            int jobRunAttemptOutputProgress = Convert.ToInt32(((dynamic)eventGridEvent.Data).output.progress);
+
+            log.LogInformation("Updating job run attempt output status from Event Grid event. JobRunAttemptOutputId={JobRunAttemptOutputId}, JobRunAttemptId={JobRunAttemptId}, JobRunAttemptOutputStatus={JobRunAttemptOutputStatus}, JobRunAttemptOutputProgress={JobRUnAttemptOutputProgress}, StatusTime={StatusTime}", jobRunAttemptOutputId, jobRunAttemptId, jobRunAttemptOutputStatus, jobRunAttemptOutputProgress, statusTime);
+            var entityId = new EntityId(nameof(JobRunAttemptOutput), jobRunAttemptOutputId);
+            await durableEntityClient.SignalEntityAsync<IJobRunAttemptOutput>(entityId, proxy => proxy.StatusUpdate((jobRunAttemptOutputStatus, jobRunAttemptOutputProgress, statusTime)));
         }
 
         private static string GetJobRunAttemptIdFromEventSubject(string eventSubject)
@@ -69,24 +68,26 @@ namespace AmsHighAvailability
             return match.Groups[1].Value;
         }
 
-        [FunctionName("SimulateStatusEvent")]
-        public async Task<IActionResult> SimulateStatusEvent(
-            [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
-            [DurableClient]IDurableEntityClient durableEntityClient,
-            ILogger log)
+        private static AmsStatus GetAmsStatusFromEventState(string state)
         {
-            var jobRunAttemptId = req.Query["jobRunAttemptId"].ToString();
-            var status = Enum.Parse<JobRunAttemptStatus>(req.Query["status"]);
-
-            await SendStatusUpdate(durableEntityClient, jobRunAttemptId, status, DateTime.UtcNow);
-
-            return new OkResult();
-        }
-
-        private async Task SendStatusUpdate(IDurableEntityClient durableEntityClient, string jobRunAttemptId, JobRunAttemptStatus status, DateTimeOffset statusTime)
-        {
-            var entityId = new EntityId(nameof(JobRunAttempt), jobRunAttemptId);
-            await durableEntityClient.SignalEntityAsync<IJobRunAttempt>(entityId, proxy => proxy.StatusUpdate((status, statusTime)));
+            switch (state)
+            {
+                case "Queued":
+                case "Scheduled":
+                    // We don't need to listen for status messages where the job has been queued or scheduled.
+                    // We aren't interested until the job actually starts getting processed.
+                    return AmsStatus.Received;
+                case "Processing":
+                    return AmsStatus.Processing;
+                case "Finished":
+                    return AmsStatus.Succeeded;
+                case "Error":
+                case "Canceling":
+                case "Canceled":
+                    return AmsStatus.Failed;
+                default:
+                    throw new InvalidOperationException($"Unexpected value for event state: {state}");
+            }
         }
     }
 }

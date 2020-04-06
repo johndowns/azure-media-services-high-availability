@@ -1,6 +1,6 @@
 ﻿namespace AmsHighAvailability.Models
 {
-    public enum JobRunAttemptStatus
+    public enum AmsStatus
     {
         Received,
         Processing,
