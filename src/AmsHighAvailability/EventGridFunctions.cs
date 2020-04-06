@@ -28,10 +28,11 @@ namespace AmsHighAvailability
 
             var jobRunAttemptId = GetJobRunAttemptIdFromEventSubject(eventGridEvent.Subject);
             var statusTime = eventGridEvent.EventTime;
+            AmsStatus jobRunAttemptStatus = GetAmsStatusFromEventState(Convert.ToString(((dynamic)eventGridEvent.Data).state));
 
-            // Map the event state to the job run attempt status.
-            string eventState = Convert.ToString(((dynamic)eventGridEvent.Data).state);
-            var jobRunAttemptStatus = GetAmsStatusFromEventState(eventState);
+            // We don't need to listen for status messages where the job has been queued or scheduled.
+            // We aren't interested until the job actually starts getting processed.
+            if (jobRunAttemptStatus == AmsStatus.Received) return;
 
             log.LogInformation("Updating job run attempt status from Event Grid event. JobRunAttemptId={JobRunAttemptId}, JobRunAttemptStatus={JobRunAttemptStatus}, StatusTime={StatusTime}", jobRunAttemptId, jobRunAttemptStatus, statusTime);
             var entityId = new EntityId(nameof(JobRunAttempt), jobRunAttemptId);
@@ -48,12 +49,14 @@ namespace AmsHighAvailability
             if (eventGridEvent.EventType != "Microsoft.Media.JobOutputStateChange") return;
 
             var jobRunAttemptId = GetJobRunAttemptIdFromEventSubject(eventGridEvent.Subject);
-            var statusTime = eventGridEvent.EventTime;
-            
-            // Get the asset name and assemble the job run attempt output ID.
+            var statusTime = eventGridEvent.EventTime;            
             string jobRunAttemptOutputId = Convert.ToString(((dynamic)eventGridEvent.Data).output.assetName);
-            AmsStatus jobRunAttemptOutputStatus = GetAmsStatusFromEventState(Convert.ToString(((dynamic)eventGridEvent.Data).output.state));
             int jobRunAttemptOutputProgress = Convert.ToInt32(((dynamic)eventGridEvent.Data).output.progress);
+            AmsStatus jobRunAttemptOutputStatus = GetAmsStatusFromEventState(Convert.ToString(((dynamic)eventGridEvent.Data).output.state));
+
+            // We don't need to listen for status messages where the job has been queued or scheduled.
+            // We aren't interested until the job actually starts getting processed.
+            if (jobRunAttemptOutputStatus == AmsStatus.Received) return;
 
             log.LogInformation("Updating job run attempt output status from Event Grid event. JobRunAttemptOutputId={JobRunAttemptOutputId}, JobRunAttemptId={JobRunAttemptId}, JobRunAttemptOutputStatus={JobRunAttemptOutputStatus}, JobRunAttemptOutputProgress={JobRUnAttemptOutputProgress}, StatusTime={StatusTime}", jobRunAttemptOutputId, jobRunAttemptId, jobRunAttemptOutputStatus, jobRunAttemptOutputProgress, statusTime);
             var entityId = new EntityId(nameof(JobRunAttemptOutput), jobRunAttemptOutputId);
@@ -74,8 +77,6 @@ namespace AmsHighAvailability
             {
                 case "Queued":
                 case "Scheduled":
-                    // We don't need to listen for status messages where the job has been queued or scheduled.
-                    // We aren't interested until the job actually starts getting processed.
                     return AmsStatus.Received;
                 case "Processing":
                     return AmsStatus.Processing;
