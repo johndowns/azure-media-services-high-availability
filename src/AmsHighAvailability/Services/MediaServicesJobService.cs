@@ -10,7 +10,7 @@ namespace AmsHighAvailability.Services
 {
     public interface IMediaServicesJobService
     {
-        Task<(bool succeeded, string[] outputAssetNames)> SubmitJobToMediaServicesEndpointAsync(
+        Task<bool> SubmitJobToMediaServicesEndpointAsync(
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
             string inputMediaUrl,
             string jobName);
@@ -24,7 +24,7 @@ namespace AmsHighAvailability.Services
         private const string AdaptiveStreamingTransformName = "MyTransformWithAdaptiveStreamingPresetMultiple";
         private const int OutputCount = 2;
 
-        public async Task<(bool succeeded, string[] outputAssetNames)> SubmitJobToMediaServicesEndpointAsync(
+        public async Task<bool> SubmitJobToMediaServicesEndpointAsync(
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
             string inputMediaUrl,
             string jobName)
@@ -55,8 +55,7 @@ namespace AmsHighAvailability.Services
             try
             {
                 var job = await SubmitJobAsync(client, resourceGroupName, mediaServicesInstanceName, AdaptiveStreamingTransformName, outputAssetNames, jobName, inputMediaUrl);
-                var succeeded = job.State == JobState.Queued || job.State == JobState.Scheduled;
-                return (succeeded, outputAssetNames);
+                return job.State == JobState.Queued || job.State == JobState.Scheduled;
             }
             catch (ApiErrorException ex)
             {

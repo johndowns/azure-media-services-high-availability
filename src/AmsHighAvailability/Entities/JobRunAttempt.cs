@@ -24,10 +24,10 @@ namespace AmsHighAvailability.Entities
     public class JobRunAttempt : IJobRunAttempt
     {
         [JsonProperty("jobId")]
-        public string JobId { get; set; }
+        public string JobId => JobRunAttemptId.Split('|')[0];
 
         [JsonProperty("jobRunAttemptId")]
-        public string JobRunAttemptId { get; set; }
+        public string JobRunAttemptId => Entity.Current.EntityKey;
 
         [JsonProperty("stampId")]
         public string StampId { get; set; }
@@ -36,15 +36,15 @@ namespace AmsHighAvailability.Entities
         public DateTimeOffset SubmittedTime { get; set; }
 
         [JsonProperty("completedTime")]
-        public DateTimeOffset? CompletedTime { get; set; }
+        public DateTimeOffset? CompletedTime { get; set; } = null;
 
         [JsonProperty("status")]
-        public AmsStatus CurrentStatus { get; set; }
+        public AmsStatus CurrentStatus { get; set; } = AmsStatus.Received;
 
         public HashSet<JobRunAttemptStatusHistory> StatusHistory { get; set; } = new HashSet<JobRunAttemptStatusHistory>();
 
         [JsonProperty("lastStatusUpdateReceivedTime")]
-        public DateTimeOffset? LastStatusUpdateReceivedTime { get; set; }
+        public DateTimeOffset? LastStatusUpdateReceivedTime { get; set; } = null;
 
         [JsonIgnore]
         private readonly IMediaServicesJobService _mediaServicesJobService;
@@ -69,29 +69,17 @@ namespace AmsHighAvailability.Entities
         public async Task Start((string inputMediaFileUrl, string stampId) arguments)
         {
             // Set up the internal metadata.
-            JobRunAttemptId = Entity.Current.EntityKey;
-            JobId = JobRunAttemptId.Split('|')[0];
             StampId = arguments.stampId;
             SubmittedTime = DateTime.UtcNow;
-            CompletedTime = null;
-            CurrentStatus = AmsStatus.Received;
-            LastStatusUpdateReceivedTime = null;
 
             // Find the details of the stamp that will be used for this job run attempt.
             var stampSettings = _settings.GetStampConfiguration(StampId);
 
             // Submit the job for processing.
-            var (isSubmittedSuccessfully, outputAssetIds) = await _mediaServicesJobService.SubmitJobToMediaServicesEndpointAsync(
+            var isSubmittedSuccessfully = await _mediaServicesJobService.SubmitJobToMediaServicesEndpointAsync(
                 stampSettings.MediaServicesSubscriptionId, stampSettings.MediaServicesResourceGroupName, stampSettings.MediaServicesInstanceName,
                 arguments.inputMediaFileUrl,
                 JobRunAttemptId);
-
-            // Set up entities for tracking the output status.
-            foreach (var outputAssetId in outputAssetIds)
-            {
-                var outputEntityId = new EntityId(nameof(JobRunAttemptOutput), outputAssetId);
-                Entity.Current.SignalEntity<IJobRunAttemptOutput>(outputEntityId, proxy => proxy.Start());
-            }
 
             // Update this entity's status.
             if (isSubmittedSuccessfully)

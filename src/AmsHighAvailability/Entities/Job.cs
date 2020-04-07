@@ -28,7 +28,7 @@ namespace AmsHighAvailability.Entities
     public class Job : IJob
     {
         [JsonProperty("jobId")]
-        public string JobId { get; set; }
+        public string JobId => Entity.Current.EntityKey;
 
         [JsonProperty("inputMediaFileUrl")]
         public string InputMediaFileUrl { get; set; }
@@ -67,9 +67,8 @@ namespace AmsHighAvailability.Entities
 
         public void Start(string inputMediaFileUrl)
         {
-            JobId = Entity.Current.EntityKey;
+            // Initialise the job.
             InputMediaFileUrl = inputMediaFileUrl;
-
             _log.LogInformation("Started job. JobId={JobId}, InputMediaFileUrl={InputMediaFileUrl}", JobId, InputMediaFileUrl);
 
             // Start a new attempt.
