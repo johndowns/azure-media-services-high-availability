@@ -10,13 +10,15 @@ using AmsHighAvailability.Entities;
 using System.Threading.Tasks;
 using AmsHighAvailability.Models;
 using System.Text.RegularExpressions;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace AmsHighAvailability
 {
     public class EventGridFunctions
     {
         private static readonly Regex EventSubjectRegex = new Regex(@".*\/jobs\/(.*)");
-
+        
         [FunctionName("AmsJobStatusUpdate")]
         public async Task AmsJobStatusUpdate(
             [EventGridTrigger]EventGridEvent eventGridEvent,
@@ -28,7 +30,9 @@ namespace AmsHighAvailability
 
             var jobRunAttemptId = GetJobRunAttemptIdFromEventSubject(eventGridEvent.Subject);
             var statusTime = eventGridEvent.EventTime;
-            AmsStatus jobRunAttemptStatus = GetAmsStatusFromEventState(Convert.ToString(((dynamic)eventGridEvent.Data).state));
+
+            var eventData = ((JObject)eventGridEvent.Data).ToObject<JobStateChangeEventData>();
+            var jobRunAttemptStatus = GetAmsStatusFromEventState(eventData.State);
 
             // We don't need to listen for status messages where the job has been queued or scheduled.
             // We aren't interested until the job actually starts getting processed.
@@ -49,10 +53,12 @@ namespace AmsHighAvailability
             if (eventGridEvent.EventType != "Microsoft.Media.JobOutputStateChange") return;
 
             var jobRunAttemptId = GetJobRunAttemptIdFromEventSubject(eventGridEvent.Subject);
-            var statusTime = eventGridEvent.EventTime;            
-            string jobRunAttemptOutputId = Convert.ToString(((dynamic)eventGridEvent.Data).output.assetName);
-            int jobRunAttemptOutputProgress = Convert.ToInt32(((dynamic)eventGridEvent.Data).output.progress);
-            AmsStatus jobRunAttemptOutputStatus = GetAmsStatusFromEventState(Convert.ToString(((dynamic)eventGridEvent.Data).output.state));
+            var statusTime = eventGridEvent.EventTime;
+
+            var eventData = ((JObject)eventGridEvent.Data).ToObject<JobOutputStateChangeEventData>();
+            var jobRunAttemptOutputId = eventData.Output.AssetName;
+            var jobRunAttemptOutputProgress = eventData.Output.Progress;
+            var jobRunAttemptOutputStatus = GetAmsStatusFromEventState(eventData.Output.State);
 
             // We don't need to listen for status messages where the job has been queued or scheduled.
             // We aren't interested until the job actually starts getting processed.
@@ -91,4 +97,30 @@ namespace AmsHighAvailability
             }
         }
     }
+
+    #region Event Grid schema types
+    public class JobStateChangeEventData
+    {
+        [JsonProperty("state")]
+        public string State { get; set; }
+    }
+
+    public class JobOutputStateChangeEventData
+    {
+        [JsonProperty("output")]
+        public OutputData Output { get; set; }
+
+        public class OutputData
+        {
+            [JsonProperty("assetName")]
+            public string AssetName { get; set; }
+
+            [JsonProperty("progress")]
+            public int Progress { get; set; }
+
+            [JsonProperty("state")]
+            public string State { get; set; }
+        }
+    }
+    #endregion
 }
