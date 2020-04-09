@@ -5,29 +5,29 @@ namespace AmsHighAvailability.Configuration
 {
     public class Options
     {
-        public TimeSpan JobRunAttemptStatusTimeoutCheckInterval { get; set; } // How often we check whether the attempt has timed out.
+        public TimeSpan JobTrackerStatusTimeoutCheckInterval { get; set; } // How often we check whether the tracker has timed out.
 
-        public TimeSpan JobRunAttemptTimeoutThreshold { get; set; } // How long the job attempt has to have gone without a status update before it is considered to have timed out.
+        public TimeSpan JobTrackerTimeoutThreshold { get; set; } // How long the job tracker has to have gone without a status update before it is considered to have timed out.
 
-        public StampRoutingMethod StampRoutingMethod { get; set; }
+        public AmsInstanceRoutingMethod AmsInstanceRoutingMethod { get; set; }
 
-        public string HomeStampId { get; set; }
-        public string AllStampIds { get; set; }
-        public string[] AlllStampIdsArray { get { return AllStampIds.Split(';'); } }
+        public string PrimaryAmsInstanceId { get; set; }
+        public string AllAmsInstanceIds { get; set; }
+        public string[] AlllAmsInstanceIdsArray { get { return AllAmsInstanceIds.Split(';'); } }
 
-        public StampConfiguration GetStampConfiguration(string stampId)
+        public AmsInstanceConfiguration GetAmsInstanceConfiguration(string amsInstanceId)
         {
-            var stampConfiguration = new StampConfiguration
+            var amsInstanceConfiguration = new AmsInstanceConfiguration
             {
-                MediaServicesSubscriptionId = Environment.GetEnvironmentVariable($"Options:Stamps:{stampId}:MediaServicesSubscriptionId"),
-                MediaServicesResourceGroupName = Environment.GetEnvironmentVariable($"Options:Stamps:{stampId}:MediaServicesResourceGroupName"),
-                MediaServicesInstanceName = Environment.GetEnvironmentVariable($"Options:Stamps:{stampId}:MediaServicesInstanceName"),
-                StampId = stampId
+                MediaServicesSubscriptionId = Environment.GetEnvironmentVariable($"Options:AmsInstances:{amsInstanceId}:MediaServicesSubscriptionId"),
+                MediaServicesResourceGroupName = Environment.GetEnvironmentVariable($"Options:AmsInstances:{amsInstanceId}:MediaServicesResourceGroupName"),
+                MediaServicesInstanceName = Environment.GetEnvironmentVariable($"Options:AmsInstances:{amsInstanceId}:MediaServicesInstanceName"),
+                AmsInstanceId = amsInstanceId
             };
 
-            return (stampConfiguration.MediaServicesSubscriptionId == null && stampConfiguration.MediaServicesResourceGroupName == null && stampConfiguration.MediaServicesInstanceName == null)
+            return (amsInstanceConfiguration.MediaServicesSubscriptionId == null && amsInstanceConfiguration.MediaServicesResourceGroupName == null && amsInstanceConfiguration.MediaServicesInstanceName == null)
                 ? null 
-                : stampConfiguration;
+                : amsInstanceConfiguration;
         }
     }
 }

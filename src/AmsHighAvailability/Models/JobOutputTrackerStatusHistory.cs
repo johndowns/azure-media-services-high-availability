@@ -2,7 +2,7 @@
 
 namespace AmsHighAvailability.Models
 {
-    public class JobRunAttemptOutputStatusHistory
+    public class JobOutputTrackerStatusHistory
     {
         public DateTimeOffset StatusTime { get; set; }
         public AmsStatus Status { get; set; }

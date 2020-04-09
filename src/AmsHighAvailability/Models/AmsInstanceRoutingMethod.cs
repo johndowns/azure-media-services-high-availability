@@ -1,6 +1,6 @@
 ﻿namespace AmsHighAvailability.Models
 {
-    public enum StampRoutingMethod
+    public enum AmsInstanceRoutingMethod
     {
         RegionalAffinity,
         RoundRobin

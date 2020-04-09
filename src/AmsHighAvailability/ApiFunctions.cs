@@ -28,10 +28,10 @@ namespace AmsHighAvailability
 
             // Start the job by signalling the entity.
             var jobId = Guid.NewGuid().ToString();
-            var entityId = new EntityId(nameof(Job), jobId);
-            await durableEntityClient.SignalEntityAsync<IJob>(entityId, proxy => proxy.Start(jobRequest.MediaFileUrl));
+            var entityId = new EntityId(nameof(JobCoordinatorEntity), jobId);
+            await durableEntityClient.SignalEntityAsync<IJobCoordinatorEntity>(entityId, proxy => proxy.Start(jobRequest.MediaFileUrl));
 
-            log.LogInformation("Initiated job. JobId={JobId}", jobId);
+            log.LogInformation("Initiated job. JobCoordinatorEntityId={JobCoordinatorEntityId}", jobId);
 
             var checkStatusLocation = $"{req.Scheme}://{req.Host}/api/jobs/{jobId}";
             return new AcceptedResult(checkStatusLocation, null);
@@ -45,8 +45,8 @@ namespace AmsHighAvailability
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
         {
-            var entityId = new EntityId(nameof(Job), jobId);
-            var entityState = await durableEntityClient.ReadEntityStateAsync<Job>(entityId);
+            var entityId = new EntityId(nameof(JobCoordinatorEntity), jobId);
+            var entityState = await durableEntityClient.ReadEntityStateAsync<JobCoordinatorEntity>(entityId);
             
             if (!entityState.EntityExists)
             {
