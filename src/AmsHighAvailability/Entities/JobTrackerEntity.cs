@@ -55,7 +55,8 @@ namespace AmsHighAvailability.Entities
                 }
 
                 // Signal the coordinator that we have an update.
-                _log.LogInformation("Job tracker is updating job coordinator. JobTrackerEntityId={JobTrackerEntityId}, JobCoordinatorEntityId={JobCoordinatorEntityId}, Status={Status}", JobTrackerEntityId, JobCoordinatorEntityId, CurrentStatus);
+                _log.LogInformation("Job tracker is updating job coordinator. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobCoordinatorEntityId={JobCoordinatorEntityId}, Status={Status}",
+                    JobCoordinatorEntityId, JobTrackerEntityId, JobCoordinatorEntityId, CurrentStatus);
                 switch (CurrentStatus)
                 {
                     case AmsStatus.TimedOut:
@@ -114,7 +115,8 @@ namespace AmsHighAvailability.Entities
             // Update this entity's status.
             if (isSubmittedSuccessfully)
             {
-                _log.LogInformation("Successfully submitted job to Azure Media Services. JobTrackerEntityId={JobTrackerEntityId}, JobCoordinatorEntityId={JobCoordinatorEntityId}, AmsInstanceId={AmsInstanceId}", JobTrackerEntityId, JobCoordinatorEntityId, AmsInstanceId);
+                _log.LogInformation("Successfully submitted job to Azure Media Services. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, AmsInstanceId={AmsInstanceId}",
+                    JobCoordinatorEntityId, JobTrackerEntityId, AmsInstanceId);
                 CurrentStatus = AmsStatus.Processing;
 
                 // Make a note to ourselves to check for a status update timeout.
@@ -122,14 +124,16 @@ namespace AmsHighAvailability.Entities
             }
             else
             {
-                _log.LogInformation("Failed to start job in Azure Media Services. JobTrackerEntityId={JobTrackerEntityId}, JobCoordinatorEntityId={JobCoordinatorEntityId}, AmsInstanceId={AmsInstanceId}", JobTrackerEntityId, JobCoordinatorEntityId, AmsInstanceId);
+                _log.LogInformation("Failed to start job in Azure Media Services. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, AmsInstanceId={AmsInstanceId}",
+                    JobCoordinatorEntityId, JobTrackerEntityId, AmsInstanceId);
                 CurrentStatus = AmsStatus.Failed;
             }
         }
 
         public void StatusUpdate((AmsStatus newStatus, DateTimeOffset statusTime) arguments)
         {
-            _log.LogInformation("Received status update for job tracker. JobTrackerEntityId={JobTrackerEntityId}, JobCoordinatorEntityId={JobCoordinatorEntityId}, Time={StatusTime}, JobTrackerStatus={JobTrackerStatus}", JobTrackerEntityId, JobCoordinatorEntityId, arguments.statusTime, arguments.newStatus);
+            _log.LogInformation("Received status update for job tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, Time={StatusTime}, JobTrackerStatus={JobTrackerStatus}",
+                JobCoordinatorEntityId, JobTrackerEntityId, arguments.statusTime, arguments.newStatus);
             StatusHistory.Add(new JobTrackerStatusHistory { Status = arguments.newStatus, StatusTime = arguments.statusTime, TimeReceived = DateTimeOffset.Now });
 
             // If this status update shows forward progress, we will mark it as the current status and update the job accordingly.
@@ -148,12 +152,14 @@ namespace AmsHighAvailability.Entities
 
         public void CheckForStatusTimeout()
         {
-            _log.LogInformation("Checking for status timeout on job tracker. JobTrackerEntityId={JobTrackerEntityId}, JobCoordinatorEntityId={JobCoordinatorEntityId}, LastStatusUpdateReceivedTime={lastStatusUpdateReceivedTime}", JobTrackerEntityId, JobCoordinatorEntityId, LastStatusUpdateReceivedTime);
+            _log.LogInformation("Checking for status timeout on job tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, LastStatusUpdateReceivedTime={lastStatusUpdateReceivedTime}",
+                JobCoordinatorEntityId, JobTrackerEntityId, LastStatusUpdateReceivedTime);
 
             if (CurrentStatus != AmsStatus.Processing)
             {
                 // We don't need to time out if the job isn't actively processing.
-                _log.LogInformation("Tracker is no longer in 'processing' state, so no further status updates are needed. JobTrackerEntityId={JobTrackerEntityId}, JobCoordinatorEntityId={JobCoordinatorEntityId}, LastStatusUpdateReceivedTime={lastStatusUpdateReceivedTime}", JobTrackerEntityId, JobCoordinatorEntityId, LastStatusUpdateReceivedTime);
+                _log.LogInformation("Tracker is no longer in 'processing' state, so no further status updates are needed. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, LastStatusUpdateReceivedTime={lastStatusUpdateReceivedTime}",
+                    JobCoordinatorEntityId, JobTrackerEntityId, LastStatusUpdateReceivedTime);
                 return;
             }
 
@@ -169,14 +175,16 @@ namespace AmsHighAvailability.Entities
         {
             if (CurrentStatus == AmsStatus.Succeeded || CurrentStatus== AmsStatus.Failed || CurrentStatus == AmsStatus.TimedOut)
             {
-                _log.LogInformation("Skipped scheduling a new status check since tracker status is terminal. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CurrentStatus={CurrentStatus}", JobCoordinatorEntityId, JobTrackerEntityId, CurrentStatus);
+                _log.LogInformation("Skipped scheduling a new status check since tracker status is terminal. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CurrentStatus={CurrentStatus}",
+                    JobCoordinatorEntityId, JobTrackerEntityId, CurrentStatus);
                 return;
             }
 
             var statusTimeoutTimeUtc = DateTime.UtcNow.Add(_settings.JobTrackerStatusTimeoutCheckInterval);
             Entity.Current.SignalEntity<IJobTracker>(Entity.Current.EntityId, statusTimeoutTimeUtc, proxy => proxy.CheckForStatusTimeout());
 
-            _log.LogInformation("Scheduled tracker to check for a status timeout. JobTrackerEntityId={JobTrackerEntityId}, JobCoordinatorEntityId={JobCoordinatorEntityId}, CheckTime={CheckTime}", JobTrackerEntityId, JobCoordinatorEntityId, statusTimeoutTimeUtc);
+            _log.LogInformation("Scheduled tracker to check for a status timeout. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CheckTime={CheckTime}",
+                JobCoordinatorEntityId, JobTrackerEntityId, statusTimeoutTimeUtc);
         }
     }
 }

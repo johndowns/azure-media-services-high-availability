@@ -25,7 +25,8 @@ namespace AmsHighAvailability
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
         {
-            log.LogInformation("Received job status Event Grid event of type {EventGridEventType} for subject {EventGridEventSubject}.", eventGridEvent.EventType, eventGridEvent.Subject);
+            log.LogInformation("Received job status Event Grid event of type {EventGridEventType} for subject {EventGridEventSubject}.",
+                eventGridEvent.EventType, eventGridEvent.Subject);
             if (eventGridEvent.EventType != "Microsoft.Media.JobStateChange") return;
 
             var jobTrackerEntityId = GetJobTrackerEntityIdFromEventSubject(eventGridEvent.Subject);
@@ -38,7 +39,8 @@ namespace AmsHighAvailability
             // We aren't interested until the job actually starts getting processed.
             if (jobTrackerStatus == AmsStatus.Received) return;
 
-            log.LogInformation("Updating job tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobTrackerStatus={JobTrackerStatus}, StatusTime={StatusTime}", jobTrackerEntityId, jobTrackerStatus, statusTime);
+            log.LogInformation("Updating job tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobTrackerStatus={JobTrackerStatus}, StatusTime={StatusTime}",
+                jobTrackerEntityId, jobTrackerStatus, statusTime);
             var entityId = new EntityId(nameof(JobTrackerEntity), jobTrackerEntityId);
             await durableEntityClient.SignalEntityAsync<IJobTracker>(entityId, proxy => proxy.StatusUpdate((jobTrackerStatus, statusTime)));
         }
@@ -49,7 +51,8 @@ namespace AmsHighAvailability
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
         {
-            log.LogInformation("Received job output status Event Grid event of type {EventGridEventType} for subject {EventGridEventSubject}.", eventGridEvent.EventType, eventGridEvent.Subject);
+            log.LogInformation("Received job output status Event Grid event of type {EventGridEventType} for subject {EventGridEventSubject}.",
+                eventGridEvent.EventType, eventGridEvent.Subject);
             if (eventGridEvent.EventType != "Microsoft.Media.JobOutputStateChange") return;
 
             var jobTrackerEntityId = GetJobTrackerEntityIdFromEventSubject(eventGridEvent.Subject);
@@ -64,7 +67,8 @@ namespace AmsHighAvailability
             // We aren't interested until the job actually starts getting processed.
             if (jobOutputTrackerStatus == AmsStatus.Received) return;
 
-            log.LogInformation("Updating job output tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, jobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}, StatusTime={StatusTime}", jobOutputTrackerEntityId, jobTrackerEntityId, jobOutputTrackerStatus, jobOutputTrackerProgress, statusTime);
+            log.LogInformation("Updating job output tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, jobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}, StatusTime={StatusTime}",
+                jobOutputTrackerEntityId, jobTrackerEntityId, jobOutputTrackerStatus, jobOutputTrackerProgress, statusTime);
             var entityId = new EntityId(nameof(JobOutputTrackerEntity), jobOutputTrackerEntityId);
             await durableEntityClient.SignalEntityAsync<IJobOutputTrackerEntity>(entityId, proxy => proxy.StatusUpdate((jobOutputTrackerStatus, jobOutputTrackerProgress, statusTime)));
         }
