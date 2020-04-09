@@ -56,7 +56,9 @@ namespace AmsHighAvailability.Entities
 
         public Job(ILogger log, IOptions<Configuration.Options> options, Random random)
         {
-            this._settings = options.Value;
+            // Due to https://github.com/Azure/azure-functions-durable-extension/issues/1238, we have to account for the fact that
+            // this constructor could be called with null arguments when the status is read by the ReadEntityStateAsync() method.
+            this._settings = options?.Value;
             this._random = random;
             this._log = log;
         }
@@ -70,12 +72,17 @@ namespace AmsHighAvailability.Entities
             // Initialise the job.
             InputMediaFileUrl = inputMediaFileUrl;
             _log.LogInformation("Started job. JobId={JobId}, InputMediaFileUrl={InputMediaFileUrl}", JobId, InputMediaFileUrl);
+            Status = JobStatus.Received;
 
             // Start a new attempt.
             var attemptStarted = StartAttempt();
             if (! attemptStarted)
             {
                 UpdateJobStatus(JobStatus.Failed);
+            }
+            else
+            {
+                Status = JobStatus.Processing;
             }
         }
 

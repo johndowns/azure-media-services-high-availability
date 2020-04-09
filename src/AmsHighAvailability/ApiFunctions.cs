@@ -8,6 +8,7 @@ using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using System;
 using AmsHighAvailability.Entities;
 using System.Web.Http;
+using System.Reflection.Metadata.Ecma335;
 
 namespace AmsHighAvailability
 {
@@ -15,7 +16,7 @@ namespace AmsHighAvailability
     {
         [FunctionName("CreateJob")]
         public async Task<IActionResult> CreateJob(
-            [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)] CreateJobRequest jobRequest,
+            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "jobs")] CreateJobRequest jobRequest,
             HttpRequest req,
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
@@ -32,10 +33,30 @@ namespace AmsHighAvailability
 
             log.LogInformation("Initiated job. JobId={JobId}", jobId);
 
+            var checkStatusLocation = $"{req.Scheme}://{req.Host}/api/jobs/{jobId}";
+            return new AcceptedResult(checkStatusLocation, null);
+        }
+
+        [FunctionName("GetJob")]
+        public async Task<IActionResult> GetJob(
+            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "jobs/{jobId}")] CreateJobRequest jobRequest,
+            HttpRequest req,
+            string jobId,
+            [DurableClient]IDurableEntityClient durableEntityClient,
+            ILogger log)
+        {
+            var entityId = new EntityId(nameof(Job), jobId);
+            var entityState = await durableEntityClient.ReadEntityStateAsync<Job>(entityId);
+            
+            if (!entityState.EntityExists)
+            {
+                return new NotFoundResult();
+            }
+
             return new OkObjectResult(new
             {
-                jobId
-            });
+                jobState = entityState.EntityState.Status.ToString()
+            }); ;
         }
     }
 

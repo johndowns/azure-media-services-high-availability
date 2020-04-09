@@ -58,6 +58,10 @@ namespace AmsHighAvailability.Entities
                 (CurrentStatus == AmsStatus.Processing && arguments.newStatus != AmsStatus.Processing) ||
                 (arguments.progress > CurrentProgress))
             {
+                // Update the current status information.
+                CurrentStatus = arguments.newStatus;
+                CurrentProgress = arguments.progress;
+
                 // Signal the JobRunAttempt that we have seen a progress update on this attempt.
                 _log.LogInformation("Updating job run attempt status from output status change. JobRunAttemptOutputId={JobRunAttemptOutputId}, JobRunAttemptId={JobRunAttemptId}, JobId={JobId}, Time={StatusTime}, JobRunAttemptOutputStatus={JobRunAttemptOutputStatus}, JobRunAttemptOutputProgress={JobRunAttemptOutputProgress}", JobRunAttemptOutputId, JobRunAttemptId, JobId, arguments.statusTime, arguments.newStatus, arguments.progress);
                 var entityId = new EntityId(nameof(JobRunAttempt), JobRunAttemptId);
