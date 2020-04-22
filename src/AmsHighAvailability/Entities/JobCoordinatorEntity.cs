@@ -87,7 +87,7 @@ namespace AmsHighAvailability.Entities
             }
         }
 
-        private void UpdateStatus(JobStatus newJobStatus) // TODO handle the fact that a tracker might have come back with a success
+        private void UpdateStatus(JobStatus newJobStatus)
         {
             Status = newJobStatus;
             _log.LogInformation("Job coordinator has completed. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobStatus={JobStatus}",
