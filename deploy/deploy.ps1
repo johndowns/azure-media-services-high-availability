@@ -1,4 +1,4 @@
-$resourceGroupName = 'YetAnotherTempAms'
+$resourceGroupName = 'YetYetAnotherTempAms'
 $resourceGroupLocation = 'australiaeast'
 $amsInstances = @(
     @{ name = "aus"; location = "australiaeast"},
@@ -13,16 +13,29 @@ New-AzResourceGroup -Name $resourceGroupName -Location $resourceGroupLocation -F
 
 # Deploy the AMS instances
 Write-Host 'Deploying Azure Media Services instances.'
-$amsDeployment = New-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile 'template-ams.json' -Verbose `
+$amsDeployment = New-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile 'template-ams.json' `
     -instances $amsInstances
 $createdAmsInstances = $amsDeployment.Outputs['createdInstances'].Value
 
 # Deploy the function app resource
 Write-Host 'Deploying Azure Functions app resources.'
-$functionAppDeployment = New-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile 'template-functionapp.json' -Verbose
+$hasDeployedFunctionApp = $false
+while ($hasDeployedFunctionApp -ne $true)
+{
+    $functionAppDeployment = New-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile 'template-functionapp.json'
+    if ($null -ne $functionAppDeployment.Outputs)
+    {
+        break
+    }
+
+    # The function app deployment failed, which is usually because the managed identity doesn't deploy the first time around.
+    # Retrying the deployment will usually resolve this.
+    Start-Sleep -Seconds 5
+    Write-Host 'Retrying deployment.'
+}
+
 $functionAppName = $functionAppDeployment.Outputs['functionAppName'].Value
 $functionAppIdentityPrincipalId = $functionAppDeployment.Outputs['functionAppIdentityPrincipalId'].Value
-# TODO put extra resiliency in here, since the managed identity can sometimes take time to provision
 
 # Deploy the function app settings
 Write-Host 'Constructing function app settings.'
@@ -73,10 +86,10 @@ Publish-AzWebApp -ResourceGroupName $resourceGroupName -Name $functionAppName -A
 
 # Deploy the Azure IAM role assignments
 Write-Host 'Deploying Azure IAM role assignments.'
-New-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile 'template-iam.json' -Verbose `
+New-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile 'template-iam.json' `
     -amsInstances $amsInstances -functionAppIdentityPrincipalId $functionAppIdentityPrincipalId
 
 # Deploy the Event Grid subscriptions
 Write-Host 'Deploying Event Grid subscriptions.'
-New-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile 'template-eventgrid.json' -Verbose `
+New-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile 'template-eventgrid.json' `
     -amsInstances $amsInstances -functionAppName $functionAppName
