@@ -25,7 +25,7 @@
         {
             "type": "Microsoft.Media/mediaServices/providers/eventSubscriptions",
             "apiVersion": "2018-01-01",
-            "name": "[concat(concat(parameters('resourceNamePrefix'), parameters('amsInstances')[copyIndex('amsInstancesCopy')].name), '/Microsoft.EventGrid/', variables('jobStatusUpdateEventGridSubscriptionName'))]",
+            "name": "[concat(concat(parameters('resourceNamePrefix'), parameters('amsInstances')[copyIndex('amsInstancesCopy')].instanceId), '/Microsoft.EventGrid/', variables('jobStatusUpdateEventGridSubscriptionName'))]",
             "copy": {
                 "name": "amsInstancesCopy",
                 "count": "[length(parameters('amsInstances'))]"
@@ -47,7 +47,7 @@
         {
             "type": "Microsoft.Media/mediaServices/providers/eventSubscriptions",
             "apiVersion": "2018-01-01",
-            "name": "[concat(concat(parameters('resourceNamePrefix'), parameters('amsInstances')[copyIndex('amsInstancesCopy')].name), '/Microsoft.EventGrid/', variables('jobOutputStatusUpdateEventGridSubscriptionName'))]",
+            "name": "[concat(concat(parameters('resourceNamePrefix'), parameters('amsInstances')[copyIndex('amsInstancesCopy')].instanceId), '/Microsoft.EventGrid/', variables('jobOutputStatusUpdateEventGridSubscriptionName'))]",
             "copy": {
                 "name": "amsInstancesCopy",
                 "count": "[length(parameters('amsInstances'))]"

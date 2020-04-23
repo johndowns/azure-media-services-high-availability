@@ -3,6 +3,6 @@
     public enum AmsInstanceRoutingMethod
     {
         RegionalAffinity,
-        RoundRobin
+        Random
     }
 }

@@ -18,7 +18,7 @@
         {
             "type": "Microsoft.Media/mediaServices",
             "apiVersion": "2018-07-01",
-            "name": "[concat(parameters('resourceNamePrefix'), parameters('instances')[copyIndex()].name)]",
+            "name": "[concat(parameters('resourceNamePrefix'), parameters('instances')[copyIndex()].instanceId)]",
             "location": "[parameters('instances')[copyIndex()].location]",
             "copy": {
                 "name": "[variables('mediaServicesCopyName')]",
@@ -30,7 +30,7 @@
             "properties": {
                 "storageAccounts": [
                     {
-                        "id": "[resourceId('Microsoft.Storage/storageAccounts', concat(parameters('resourceNamePrefix'), parameters('instances')[copyIndex()].name))]",
+                        "id": "[resourceId('Microsoft.Storage/storageAccounts', concat(parameters('resourceNamePrefix'), parameters('instances')[copyIndex()].instanceId))]",
                         "type": "Primary"
                     }
                 ]   
@@ -39,7 +39,7 @@
         {
             "type": "Microsoft.Storage/storageAccounts",
             "apiVersion": "2019-04-01",
-            "name": "[concat(parameters('resourceNamePrefix'), parameters('instances')[copyIndex()].name)]",
+            "name": "[concat(parameters('resourceNamePrefix'), parameters('instances')[copyIndex()].instanceId)]",
             "location": "[parameters('instances')[copyIndex()].location]",
             "sku": {
                 "name": "Standard_LRS"
@@ -57,11 +57,11 @@
             "copy": {
               "count": "[length(parameters('instances'))]",
               "input": {
-                  "name": "[parameters('instances')[copyIndex()].name]",
+                  "instanceId": "[parameters('instances')[copyIndex()].instanceId]",
                   "location": "[parameters('instances')[copyIndex()].location]",
                   "resourceGroupName": "[resourceGroup().name]",
                   "azureSubscriptionId": "[subscription().subscriptionId]",
-                  "instanceName": "[concat(parameters('resourceNamePrefix'), parameters('instances')[copyIndex()].name)]"
+                  "amsInstanceResourceName": "[concat(parameters('resourceNamePrefix'), parameters('instances')[copyIndex()].instanceId)]"
               }
             }
           }
