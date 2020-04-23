@@ -1,0 +1,70 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "amsInstances": {
+            "type": "array"
+        },
+        "functionAppName": {
+            "type": "string"
+        },
+        "resourceNamePrefix": {
+            "type": "string",
+            "defaultValue": "[uniqueString(subscription().subscriptionId, resourceGroup().name)]"
+        }
+    },
+    "variables": {
+        "jobStatusUpdateEventGridSubscriptionName": "JobStateChange",
+        "jobOutputStatusUpdateEventGridSubscriptionName": "JobOutputStateChange",
+        "amsJobStatusUpdateFunctionName": "AmsJobStatusUpdate",
+        "amsJobOutputStatusUpdateFunctionName": "AmsJobOutputStatusUpdate",
+        "amsJobStatusUpdateFunctionUrl" : "[concat('https://', parameters('functionAppName'),'.azurewebsites.net/runtime/webhooks/eventgrid?functionName=', variables('amsJobStatusUpdateFunctionName'),'&code=')]",
+        "amsJobOutputStatusUpdateFunctionUrl" : "[concat('https://', parameters('functionAppName'),'.azurewebsites.net/runtime/webhooks/eventgrid?functionName=', variables('amsJobOutputStatusUpdateFunctionName'),'&code=')]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Media/mediaServices/providers/eventSubscriptions",
+            "apiVersion": "2018-01-01",
+            "name": "[concat(concat(parameters('resourceNamePrefix'), parameters('amsInstances')[copyIndex('amsInstancesCopy')].name), '/Microsoft.EventGrid/', variables('jobStatusUpdateEventGridSubscriptionName'))]",
+            "copy": {
+                "name": "amsInstancesCopy",
+                "count": "[length(parameters('amsInstances'))]"
+            },
+            "properties": {
+                "filter": {
+                    "includedEventTypes": [
+                        "Microsoft.Media.JobStateChange"
+                    ]
+                },
+                "destination": {
+                    "endpointType": "WebHook",
+                    "properties": {
+                        "endpointUrl": "[concat(variables('amsJobStatusUpdateFunctionUrl'), listKeys(resourceId('Microsoft.Web/sites/host/', parameters('functionAppName'), 'default'), '2016-08-01').systemkeys.eventgrid_extension)]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Media/mediaServices/providers/eventSubscriptions",
+            "apiVersion": "2018-01-01",
+            "name": "[concat(concat(parameters('resourceNamePrefix'), parameters('amsInstances')[copyIndex('amsInstancesCopy')].name), '/Microsoft.EventGrid/', variables('jobOutputStatusUpdateEventGridSubscriptionName'))]",
+            "copy": {
+                "name": "amsInstancesCopy",
+                "count": "[length(parameters('amsInstances'))]"
+            },
+            "properties": {
+                "filter": {
+                    "includedEventTypes": [
+                        "Microsoft.Media.JobOutputStateChange"
+                    ]
+                },
+                "destination": {
+                    "endpointType": "WebHook",
+                    "properties": {
+                        "endpointUrl": "[concat(variables('amsJobOutputStatusUpdateFunctionUrl'), listKeys(resourceId('Microsoft.Web/sites/host/', parameters('functionAppName'), 'default'), '2016-08-01').systemkeys.eventgrid_extension)]"
+                    }
+                }
+            }
+        }
+    ]
+}
