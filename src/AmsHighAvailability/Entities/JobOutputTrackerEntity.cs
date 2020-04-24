@@ -33,8 +33,8 @@ namespace AmsHighAvailability.Entities
 
         public HashSet<JobOutputTrackerStatusHistory> StatusHistory { get; set; } = new HashSet<JobOutputTrackerStatusHistory>();
 
-        [JsonProperty("lastStatusUpdateReceivedTime")]
-        public DateTimeOffset? LastStatusUpdateReceivedTime { get; set; } = null;
+        [JsonProperty("LastTimeSeenJobOutputProgress")]
+        public DateTimeOffset? LastTimeSeenJobOutputProgress { get; set; } = null;
 
         [JsonIgnore]
         private readonly ILogger _log;
@@ -54,20 +54,26 @@ namespace AmsHighAvailability.Entities
                 JobCoordinatorEntityId, JobTrackerEntityId, JobOutputTrackerEntityId, arguments.statusTime, arguments.newStatus, arguments.progress);
             StatusHistory.Add(new JobOutputTrackerStatusHistory { StatusTime = arguments.statusTime, Progress = arguments.progress, TimeReceived = DateTimeOffset.Now });
 
-            // If we see the status move from 'Received' to something else, or from 'Processing' to something else, or we see the progress increase, then we count this as progress
+            // If we see the status move from 'Received' to something else, or from 'Processing'
+            // to something else, or we see the progress increase, then we count this as progress.
             if ((CurrentStatus == AmsStatus.Received && arguments.newStatus != AmsStatus.Received) ||
                 (CurrentStatus == AmsStatus.Processing && arguments.newStatus != AmsStatus.Processing) ||
                 (arguments.progress > CurrentProgress))
             {
-                // Update the current status information.
-                CurrentStatus = arguments.newStatus;
-                CurrentProgress = arguments.progress;
+                if (LastTimeSeenJobOutputProgress == null ||
+                    arguments.statusTime > LastTimeSeenJobOutputProgress)
+                {
+                    // Update the current status information.
+                    CurrentStatus = arguments.newStatus;
+                    CurrentProgress = arguments.progress;
+                    LastTimeSeenJobOutputProgress = arguments.statusTime;
 
-                // Signal the tracker that we have seen a progress update.
-                _log.LogInformation("Updating job tracker status from output tracker's status change. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Time={StatusTime}, JobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
-                    JobCoordinatorEntityId, JobTrackerEntityId, JobOutputTrackerEntityId, arguments.statusTime, arguments.newStatus, arguments.progress);
-                var entityId = new EntityId(nameof(JobTrackerEntity), JobTrackerEntityId);
-                Entity.Current.SignalEntity<IJobTracker>(entityId, proxy => proxy.StatusUpdate((AmsStatus.Processing, arguments.statusTime)));
+                    // Signal the tracker that we have seen a progress update.
+                    _log.LogInformation("Updating job tracker status from output tracker's status change. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Time={StatusTime}, JobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
+                        JobCoordinatorEntityId, JobTrackerEntityId, JobOutputTrackerEntityId, arguments.statusTime, arguments.newStatus, arguments.progress);
+                    var entityId = new EntityId(nameof(JobTrackerEntity), JobTrackerEntityId);
+                    Entity.Current.SignalEntity<IJobTracker>(entityId, proxy => proxy.OutputStatusUpdate(arguments.statusTime));
+                }
             }
         }
     }
