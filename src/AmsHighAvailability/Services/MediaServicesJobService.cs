@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Azure.Management.Media;
@@ -22,7 +23,21 @@ namespace AmsHighAvailability.Services
         // https://github.com/Azure-Samples/media-services-v3-dotnet-quickstarts/tree/master/AMSV3Quickstarts/EncodeAndStreamFiles
 
         private const string AdaptiveStreamingTransformName = "MyTransformWithAdaptiveStreamingPresetMultiple";
-        private const int OutputCount = 2;
+        private static readonly TransformOutput[] Outputs = new TransformOutput[]
+        {
+            // There are two outputs on this transform.
+            new TransformOutput
+            {
+                // The preset for the Transform is set to one of Media Services built-in sample presets.
+                // You can  customize the encoding settings by changing this to use "StandardEncoderPreset" class.
+                Preset = new BuiltInStandardEncoderPreset()
+                {
+                    // This sample uses the built-in encoding preset for Adaptive Bitrate Streaming.
+                    PresetName = EncoderNamedPreset.AdaptiveStreaming
+                }
+            },
+            new TransformOutput(new AudioAnalyzerPreset("en-US"))
+        };
 
         public async Task<bool> SubmitJobToMediaServicesEndpointAsync(
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
@@ -44,8 +59,8 @@ namespace AmsHighAvailability.Services
             await GetOrCreateTransformAsync(client, resourceGroupName, mediaServicesInstanceName, AdaptiveStreamingTransformName);
 
             // Create output assets to receive the job outputs.
-            var outputAssetNames = new string[OutputCount];
-            for (var i = 0; i < OutputCount; i++)
+            var outputAssetNames = new string[Outputs.Length];
+            for (var i = 0; i < Outputs.Length; i++)
             {
                 outputAssetNames[i] = $"{jobName}|{i}";
                 await CreateOutputAssetAsync(client, resourceGroupName, mediaServicesInstanceName, outputAssetNames[i]);
@@ -60,53 +75,43 @@ namespace AmsHighAvailability.Services
             catch (ApiErrorException ex)
             {
                 throw new Exception(ex.Body.Error.Message);
-            }            
+            }
         }
 
         private async Task<Transform> GetOrCreateTransformAsync(
             IAzureMediaServicesClient client,
-            string resourceGroupName,
-            string accountName,
+            string resourceGroupName, string mediaServicesInstanceName,
             string transformName)
         {
             // Does a Transform already exist with the desired name? Assume that an existing Transform with the desired name
             // also uses the same recipe or Preset for processing content.
-            var transform = await client.Transforms.GetAsync(resourceGroupName, accountName, transformName);
+            var transform = await client.Transforms.GetAsync(
+                resourceGroupName, mediaServicesInstanceName,
+                transformName);
             if (transform != null) return transform;
 
-            // You need to specify what you want it to produce as an output
-            var output = new TransformOutput[]
-            {
-                // There are two outputs on this transform.
-                new TransformOutput
-                {
-                    // The preset for the Transform is set to one of Media Services built-in sample presets.
-                    // You can  customize the encoding settings by changing this to use "StandardEncoderPreset" class.
-                    Preset = new BuiltInStandardEncoderPreset()
-                    {
-                        // This sample uses the built-in encoding preset for Adaptive Bitrate Streaming.
-                        PresetName = EncoderNamedPreset.AdaptiveStreaming
-                    }
-                },
-                new TransformOutput(new AudioAnalyzerPreset("en-US"))
-            };
-
             // Create the Transform with the output defined above
-            return await client.Transforms.CreateOrUpdateAsync(resourceGroupName, accountName, transformName, output);
+            return await client.Transforms.CreateOrUpdateAsync(
+                resourceGroupName, mediaServicesInstanceName,
+                transformName,
+                Outputs);
         }
 
-        private Task<Asset> CreateOutputAssetAsync(IAzureMediaServicesClient client, string resourceGroupName, string accountName, string assetName)
+        private Task<Asset> CreateOutputAssetAsync(
+            IAzureMediaServicesClient client,
+            string resourceGroupName, string mediaServicesInstanceName,
+            string assetName)
         {
-            return client.Assets.CreateOrUpdateAsync(resourceGroupName, accountName, assetName, new Asset());
+            return client.Assets.CreateOrUpdateAsync(
+                resourceGroupName, mediaServicesInstanceName,
+                assetName,
+                new Asset());
         }
 
-        private async Task<Job> SubmitJobAsync(IAzureMediaServicesClient client,
-            string resourceGroup,
-            string accountName,
-            string transformName,
-            string[] outputAssetNames,
-            string jobName,
-            string inputMediaUrl)
+        private async Task<Job> SubmitJobAsync(
+            IAzureMediaServicesClient client,
+            string resourceGroupName, string mediaServicesInstanceName,
+            string transformName,string[] outputAssetNames, string jobName, string inputMediaUrl)
         {
             // This example shows how to encode from any HTTPs source URL - a new feature of the v3 API.  
             // Change the URL to any accessible HTTPs URL or SAS URL from Azure.
@@ -120,8 +125,7 @@ namespace AmsHighAvailability.Services
             // to get the existing job. In Media Services v3, Get methods on entities returns null 
             // if the entity doesn't exist (a case-insensitive check on the name).
             var job = await client.Jobs.CreateAsync(
-                resourceGroup,
-                accountName,
+                resourceGroupName, mediaServicesInstanceName,
                 transformName,
                 jobName,
                 new Job
@@ -129,9 +133,21 @@ namespace AmsHighAvailability.Services
                     Input = jobInput,
                     Outputs = jobOutputs,
                 });
-
             return job;
         }
 
+        private async Task<(JobState, IEnumerable<string>)> GetAmsJobStatusAndOutputLabels( // TODO use this
+            IAzureMediaServicesClient client,
+            string resourceGroupName, string mediaServicesInstanceName,
+            string transformName, string jobName)
+        {
+            var job = await client.Jobs.GetAsync(
+                resourceGroupName, mediaServicesInstanceName,
+                transformName,
+                jobName);
+
+            var outputLabels = job.Outputs.Select(o => o.Label);
+            return (job.State, outputLabels);
+        }
     }
 }

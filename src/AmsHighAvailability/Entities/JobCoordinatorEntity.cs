@@ -45,6 +45,9 @@ namespace AmsHighAvailability.Entities
         [JsonProperty("trackers")]
         public HashSet<(string amsInstanceId, string trackerId)> Trackers { get; set; } = new HashSet<(string amsInstanceId, string trackerId)>();
 
+        [JsonProperty("completedJob")]
+        public CompletedJob CompletedJob { get; set; }
+
         [JsonIgnore]
         private readonly Configuration.Options _settings;
 
@@ -99,6 +102,13 @@ namespace AmsHighAvailability.Entities
             _log.LogInformation("Job tracker has succeeded. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={jobTrackerEntityId}",
                 JobCoordinatorEntityId, jobTrackerEntityId);
             UpdateStatus(JobStatus.Succeeded);
+
+            // Keep a note of the tracker that succeeded with the job, so that the user can find the associated outputs.
+            CompletedJob = new CompletedJob
+            {
+                AmsInstanceId = Trackers.Single(t => t.trackerId == jobTrackerEntityId).amsInstanceId
+                // TODO outputs
+            };
         }
 
         public void MarkTrackerAsCanceled(string jobTrackerEntityId)

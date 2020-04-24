@@ -1,3 +1,5 @@
+$ErrorActionPreference = 'Stop'
+
 $resourceGroupName = 'TempAms3'
 $resourceGroupLocation = 'australiaeast'
 $amsInstances = @(

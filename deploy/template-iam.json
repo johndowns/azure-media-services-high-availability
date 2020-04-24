@@ -20,7 +20,7 @@
         {
             "type": "Microsoft.Media/mediaServices/providers/roleAssignments",
             "apiVersion": "2018-09-01-preview",
-            "name": "[concat(concat(parameters('resourceNamePrefix'), parameters('amsInstances')[copyIndex('amsInstancesCopy')].instanceId), '/Microsoft.Authorization/', guid(subscription().subscriptionId, resourceGroup().id, parameters('amsInstances')[copyIndex('amsInstancesCopy')].name))]",
+            "name": "[concat(concat(parameters('resourceNamePrefix'), parameters('amsInstances')[copyIndex('amsInstancesCopy')].instanceId), '/Microsoft.Authorization/', guid(subscription().subscriptionId, resourceGroup().id, parameters('amsInstances')[copyIndex('amsInstancesCopy')].instanceId))]",
             "copy": {
                 "name": "amsInstancesCopy",
                 "count": "[length(parameters('amsInstances'))]"

@@ -8,7 +8,7 @@ using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using System;
 using AmsHighAvailability.Entities;
 using System.Web.Http;
-using System.Reflection.Metadata.Ecma335;
+using System.Collections.Generic;
 
 namespace AmsHighAvailability
 {
@@ -53,17 +53,45 @@ namespace AmsHighAvailability
                 return new NotFoundResult();
             }
 
-            return new OkObjectResult(new
+            var response = new JobStatusResponse
             {
-                jobState = entityState.EntityState.Status.ToString()
-            }); ;
+                JobState = entityState.EntityState.Status.ToString(),
+                MediaFileUrl = entityState.EntityState.InputMediaFileUrl
+            };
+
+            if (entityState.EntityState.Status == Models.JobStatus.Succeeded)
+            {
+                response.Outputs = new JobOutputsResponse
+                {
+                    ProcessedByAmsInstanceId = entityState.EntityState.CompletedJob.AmsInstanceId,
+                    OutputLabels = entityState.EntityState.CompletedJob.OutputLabels
+                };
+            }
+
+            return new OkObjectResult(response);
         }
     }
 
-    #region API Request Models
+    #region API Request and Response Models, TODO sort
     public class CreateJobRequest
     {
         public string MediaFileUrl { get; set; } // e.g. https://nimbuscdn-nimbuspm.streaming.mediaservices.windows.net/2b533311-b215-4409-80af-529c3e853622/Ignite-short.mp4
+    }
+
+    public class JobStatusResponse
+    {
+        public string JobState { get; set; }
+
+        public string MediaFileUrl { get; set; }
+
+        public JobOutputsResponse Outputs { get; set; }
+    }
+
+    public class JobOutputsResponse
+    {
+        public string ProcessedByAmsInstanceId { get; set; }
+
+        public IEnumerable<string> OutputLabels { get; set; }
     }
     #endregion
 }
