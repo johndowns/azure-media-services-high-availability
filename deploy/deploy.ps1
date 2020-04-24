@@ -36,6 +36,7 @@ while ($hasDeployedFunctionApp -ne $true)
 
 $functionAppName = $functionAppDeployment.Outputs['functionAppName'].Value
 $functionAppIdentityPrincipalId = $functionAppDeployment.Outputs['functionAppIdentityPrincipalId'].Value
+$functionAppApiKey = $functionAppDeployment.Outputs['functionAppApiKey'].Value
 
 # Deploy the function app settings with references to the Azure Media Services resources.
 Write-Host 'Constructing function app settings.'
@@ -92,3 +93,7 @@ New-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFil
 Write-Host 'Deploying Event Grid subscriptions.'
 New-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile 'template-eventgrid.json' `
     -amsInstances $amsInstances -functionAppName $functionAppName
+
+# Output the URL to use to create a media encoding job.
+Write-Host 'Deployment successful.'
+Write-Host "To test this API, try submitting a POST request to https://$functionAppName.azurewebsites.net/api/jobs?code=$functionAppApiKey"

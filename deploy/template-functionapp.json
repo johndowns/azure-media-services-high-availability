@@ -87,14 +87,14 @@
             },
             "resources": [
                 {
-                    "type": "host/systemKeys",
+                    "type": "host/functionKeys",
                     "apiVersion": "2018-11-01",
-                    "name": "default/eventGrid",
+                    "name": "default/api",
                     "dependsOn": [
                         "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
                     ],
                     "properties": {
-                        "name": "eventGrid"
+                        "name": "api"
                     }
                 }
             ],
@@ -111,6 +111,10 @@
         "functionAppIdentityPrincipalId": {
             "type": "string",
             "value": "[reference(concat(resourceId('Microsoft.Web/sites', variables('functionAppName')), '/providers/Microsoft.ManagedIdentity/identities/default'), '2015-08-31-PREVIEW').principalId]"
+        },
+        "functionAppApiKey": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.Web/sites/host/functionKeys', variables('functionAppName'), 'default', 'api')).value]"
         }
     }
 }
