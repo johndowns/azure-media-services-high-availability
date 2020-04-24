@@ -2,6 +2,13 @@
 
 Azure Media Services (AMS) runs within a single region. In the event of a regional outage or fault, requests to the encoding service within that region may fail. Solutions that require a high degree of fault tolerance may benefit from deploying Media Services instances across multiple regions. This document describes a reference architecture for such a system, which is a variant of the [Scheduler Agent Supervisor pattern](https://docs.microsoft.com/en-us/azure/architecture/patterns/scheduler-agent-supervisor).
 
+The following types of outages are mitigated by this approach:
+
+1. **Azure Media Services regional outages and faults.** In the event of a regional issue with Azure Media Services, the this architecture will detect that the service is unhealthy and will reroute those requests to another instance.
+2. **Blob storage regional outages and faults.** In the event of a regional issue with Azure Storage that prevents the client from uploading blobs, the client application can route the writing of source media blobs to a secondary region.
+
+Furthermore, this approach could allow for geo-distribution of the workloads, while maintaining a single control plane for all encoding jobs, if desired.
+
 ## Solution design
 
 This solution involves three layers:
@@ -49,4 +56,18 @@ However, the approach has a number of disadvantages and caveats:
 
 2. **Limited scope.** This solution is not designed to provide high availability across every component of the solution. Single points of failure still exist, including the function app and the [Azure Storage components used by the Durable Functions SDK](https://docs.microsoft.com/en-us/azure/azure-functions/durable/durable-functions-perf-and-scale). If a request is accepted into the job coordinator and then a regional outage occurs in one of these components, that job may not be completed until the outage is resolved. Alternative approaches would be necessary to mitigate this risk.
 
-3. **Cost implications.** There may be some cost implications to executing jobs across regions, both because of the network traffic costs incurred when sending the media files as well as potentially redundant extra processing of a single job.
+3. **Cost implications.** There may be some cost implications to executing jobs across regions, both because of the network traffic costs incurred when sending the media files as well as potentially redundant extra processing of a single job (although note that cancelled and failed jobs are not billed by Azure Media Services).
+
+## Trying out the sample
+
+Please execute the `deploy/deploy.ps1` PowerShell script to deploy the sample code into your own Azure subscription.
+
+Once you have deployed the components, you can create a new job by using the job coordinator API. The deployment script outputs a customised URL for your environment. Using a tool like Postman, send a `POST` HTTP request to that URL with a JSON body like this:
+
+```json
+{
+  "mediaFileUrl": "https://nimbuscdn-nimbuspm.streaming.mediaservices.windows.net/2b533311-b215-4409-80af-529c3e853622/Ignite-short.mp4"
+}
+```
+
+This API returns a `202 Accepted` response code with a `Location` header that represents the job. You can issue an HTTP `GET` against this URL to retrieve the job's status. Note that, to enable security on this API, you need to include the `?code={your-unique-function-key}` query string parameter to access this API.
