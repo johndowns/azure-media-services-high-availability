@@ -15,6 +15,10 @@ namespace AmsHighAvailability.Services
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
             string inputMediaUrl,
             string jobName);
+
+        Task<(JobState, IEnumerable<string>)> GetAmsJobStatusAndOutputLabels(
+           string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
+           string jobName);
     }
 
     public class MediaServicesJobService : IMediaServicesJobService
@@ -44,16 +48,7 @@ namespace AmsHighAvailability.Services
             string inputMediaUrl,
             string jobName)
         {
-            // Authenticate to Azure.
-            var azureServiceTokenProvider = new AzureServiceTokenProvider();
-            var accessToken = await azureServiceTokenProvider.GetAccessTokenAsync("https://management.azure.com");
-            ServiceClientCredentials credentials = new TokenCredentials(accessToken);
-
-            // Establish a connection to Media Services.
-            var client = new AzureMediaServicesClient(credentials)
-            {
-                SubscriptionId = subscriptionId
-            };
+            var client = await GetAzureMediaServicesClient(subscriptionId);
 
             // Ensure the transform profile exists.
             await GetOrCreateTransformAsync(client, resourceGroupName, mediaServicesInstanceName, AdaptiveStreamingTransformName);
@@ -66,7 +61,7 @@ namespace AmsHighAvailability.Services
                 await CreateOutputAssetAsync(client, resourceGroupName, mediaServicesInstanceName, outputAssetNames[i]);
             }
 
-            // Submit the job to Media Services
+            // Submit the job to Media Services.
             try
             {
                 var job = await SubmitJobAsync(client, resourceGroupName, mediaServicesInstanceName, AdaptiveStreamingTransformName, outputAssetNames, jobName, inputMediaUrl);
@@ -76,6 +71,35 @@ namespace AmsHighAvailability.Services
             {
                 throw new Exception(ex.Body.Error.Message);
             }
+        }
+
+        public async Task<(JobState, IEnumerable<string>)> GetAmsJobStatusAndOutputLabels(
+            string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
+            string jobName)
+        {
+            var client = await GetAzureMediaServicesClient(subscriptionId);
+
+            // Retrieve the job and map the state and output labels to return value.
+            var job = await client.Jobs.GetAsync(
+                resourceGroupName, mediaServicesInstanceName,
+                AdaptiveStreamingTransformName,
+                jobName);
+            var outputLabels = job.Outputs.Select(o => o.Label);
+            return (job.State, outputLabels);
+        }
+
+        private async Task<AzureMediaServicesClient> GetAzureMediaServicesClient(string subscriptionId)
+        {
+            // Authenticate to Azure.
+            var azureServiceTokenProvider = new AzureServiceTokenProvider();
+            var accessToken = await azureServiceTokenProvider.GetAccessTokenAsync("https://management.azure.com");
+            ServiceClientCredentials credentials = new TokenCredentials(accessToken);
+
+            // Establish a connection to Media Services.
+            return new AzureMediaServicesClient(credentials)
+            {
+                SubscriptionId = subscriptionId
+            };
         }
 
         private async Task<Transform> GetOrCreateTransformAsync(
@@ -134,20 +158,6 @@ namespace AmsHighAvailability.Services
                     Outputs = jobOutputs,
                 });
             return job;
-        }
-
-        private async Task<(JobState, IEnumerable<string>)> GetAmsJobStatusAndOutputLabels( // TODO use this
-            IAzureMediaServicesClient client,
-            string resourceGroupName, string mediaServicesInstanceName,
-            string transformName, string jobName)
-        {
-            var job = await client.Jobs.GetAsync(
-                resourceGroupName, mediaServicesInstanceName,
-                transformName,
-                jobName);
-
-            var outputLabels = job.Outputs.Select(o => o.Label);
-            return (job.State, outputLabels);
         }
     }
 }
