@@ -72,10 +72,10 @@ namespace AmsHighAvailability
         }
     }
 
-    #region API Request and Response Models, TODO sort
+    #region API Request and Response Models
     public class CreateJobRequest
     {
-        public string MediaFileUrl { get; set; } // e.g. https://nimbuscdn-nimbuspm.streaming.mediaservices.windows.net/2b533311-b215-4409-80af-529c3e853622/Ignite-short.mp4
+        public string MediaFileUrl { get; set; }
     }
 
     public class JobStatusResponse
