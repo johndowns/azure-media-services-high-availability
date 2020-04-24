@@ -36,6 +36,9 @@ namespace AmsHighAvailability.Entities
         [JsonProperty("amsInstanceConfiguration")]
         public AmsInstanceConfiguration AmsInstanceConfiguration { get; set; }
 
+        [JsonProperty("assets")]
+        public IEnumerable<AmsAsset> Assets { get; set; }
+
         [JsonProperty("submittedTime")]
         public DateTimeOffset SubmittedTime { get; set; }
 
@@ -63,8 +66,8 @@ namespace AmsHighAvailability.Entities
                     Entity.Current.SignalEntity<IJobCoordinatorEntity>(new EntityId(nameof(JobCoordinatorEntity), JobCoordinatorEntityId), proxy => proxy.MarkTrackerAsTimedOut(JobTrackerEntityId));
                     break;
                 case AmsStatus.Succeeded:
-                    var (_, outputLabels) = await _mediaServicesJobService.GetAmsJobStatusAndOutputLabels(AmsInstanceConfiguration.MediaServicesSubscriptionId, AmsInstanceConfiguration.MediaServicesResourceGroupName, AmsInstanceConfiguration.MediaServicesInstanceName, JobTrackerEntityId);
-                    Entity.Current.SignalEntity<IJobCoordinatorEntity>(new EntityId(nameof(JobCoordinatorEntity), JobCoordinatorEntityId), proxy => proxy.MarkTrackerAsSucceeded((JobTrackerEntityId, outputLabels)));
+                    await UpdateAssets();
+                    Entity.Current.SignalEntity<IJobCoordinatorEntity>(new EntityId(nameof(JobCoordinatorEntity), JobCoordinatorEntityId), proxy => proxy.MarkTrackerAsSucceeded((JobTrackerEntityId, Assets)));
                     break;
                 case AmsStatus.Failed:
                     Entity.Current.SignalEntity<IJobCoordinatorEntity>(new EntityId(nameof(JobCoordinatorEntity), JobCoordinatorEntityId), proxy => proxy.MarkTrackerAsFailed(JobTrackerEntityId));
@@ -107,7 +110,7 @@ namespace AmsHighAvailability.Entities
             AmsInstanceConfiguration = _settings.GetAmsInstanceConfiguration(AmsInstanceId);
 
             // Submit the job for processing.
-            var isSubmittedSuccessfully = await _mediaServicesJobService.SubmitJobToMediaServicesEndpointAsync(
+            var (isSubmittedSuccessfully, assets) = await _mediaServicesJobService.SubmitJobToMediaServicesEndpointAsync(
                 AmsInstanceConfiguration.MediaServicesSubscriptionId, AmsInstanceConfiguration.MediaServicesResourceGroupName, AmsInstanceConfiguration.MediaServicesInstanceName,
                 arguments.inputMediaFileUrl,
                 JobTrackerEntityId);
@@ -117,6 +120,7 @@ namespace AmsHighAvailability.Entities
             {
                 _log.LogInformation("Successfully submitted job to Azure Media Services. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, AmsInstanceId={AmsInstanceId}",
                     JobCoordinatorEntityId, JobTrackerEntityId, AmsInstanceId);
+                Assets = assets;
                 await UpdateCurrentStatus(AmsStatus.Processing);
 
                 // Make a note to ourselves to check for a status update timeout.
@@ -186,6 +190,18 @@ namespace AmsHighAvailability.Entities
 
             _log.LogInformation("Scheduled tracker to check for a status timeout. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CheckTime={CheckTime}",
                 JobCoordinatorEntityId, JobTrackerEntityId, statusTimeoutTimeUtc);
+        }
+
+        private async Task UpdateAssets()
+        {
+            foreach (var asset in Assets)
+            {
+                var (storageAccountName, container) = await _mediaServicesJobService.GetAssetDetails(
+                    AmsInstanceConfiguration.MediaServicesSubscriptionId, AmsInstanceConfiguration.MediaServicesResourceGroupName, AmsInstanceConfiguration.MediaServicesInstanceName,
+                    asset.Name);
+                asset.StorageAccountName = storageAccountName;
+                asset.Container = container;
+            }
         }
     }
 }

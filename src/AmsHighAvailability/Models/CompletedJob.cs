@@ -6,6 +6,6 @@ namespace AmsHighAvailability.Models
     {
         public string AmsInstanceId { get; set; }
 
-        public IEnumerable<string> OutputLabels { get; set; }
+        public IEnumerable<AmsAsset> Assets { get; set; }
     }
 }

@@ -9,6 +9,7 @@ using System;
 using AmsHighAvailability.Entities;
 using System.Web.Http;
 using System.Collections.Generic;
+using AmsHighAvailability.Models;
 
 namespace AmsHighAvailability
 {
@@ -64,7 +65,7 @@ namespace AmsHighAvailability
                 response.Outputs = new JobOutputsResponse
                 {
                     ProcessedByAmsInstanceId = entityState.EntityState.CompletedJob.AmsInstanceId,
-                    OutputLabels = entityState.EntityState.CompletedJob.OutputLabels
+                    Assets = entityState.EntityState.CompletedJob.Assets
                 };
             }
 
@@ -91,7 +92,7 @@ namespace AmsHighAvailability
     {
         public string ProcessedByAmsInstanceId { get; set; }
 
-        public IEnumerable<string> OutputLabels { get; set; }
+        public IEnumerable<AmsAsset> Assets { get; set; }
     }
     #endregion
 }

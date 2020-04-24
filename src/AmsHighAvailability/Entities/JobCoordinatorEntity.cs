@@ -15,7 +15,7 @@ namespace AmsHighAvailability.Entities
     {
         void Start(string inputMediaFileUrl);
 
-        void MarkTrackerAsSucceeded((string jobTrackerEntityId, IEnumerable<string> outputLabels) arguments);
+        void MarkTrackerAsSucceeded((string jobTrackerEntityId, IEnumerable<AmsAsset> assets) arguments);
                  
         void MarkTrackerAsCanceled(string jobTrackerEntityId);
                  
@@ -97,7 +97,7 @@ namespace AmsHighAvailability.Entities
                 JobCoordinatorEntityId, Status);
         }
 
-        public void MarkTrackerAsSucceeded((string jobTrackerEntityId, IEnumerable<string> outputLabels) arguments)
+        public void MarkTrackerAsSucceeded((string jobTrackerEntityId, IEnumerable<AmsAsset> assets) arguments)
         {
             _log.LogInformation("Job tracker has succeeded. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={jobTrackerEntityId}",
                 JobCoordinatorEntityId, arguments.jobTrackerEntityId);
@@ -107,7 +107,7 @@ namespace AmsHighAvailability.Entities
             CompletedJob = new CompletedJob
             {
                 AmsInstanceId = Trackers.Single(t => t.trackerId == arguments.jobTrackerEntityId).amsInstanceId,
-                OutputLabels = arguments.outputLabels
+                Assets = arguments.assets
             };
         }
 

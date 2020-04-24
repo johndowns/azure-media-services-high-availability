@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AmsHighAvailability.Models;
 using Microsoft.Azure.Management.Media;
 using Microsoft.Azure.Management.Media.Models;
 using Microsoft.Azure.Services.AppAuthentication;
@@ -11,14 +12,14 @@ namespace AmsHighAvailability.Services
 {
     public interface IMediaServicesJobService
     {
-        Task<bool> SubmitJobToMediaServicesEndpointAsync(
+        Task<(bool success, IEnumerable<AmsAsset> assets)> SubmitJobToMediaServicesEndpointAsync(
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
             string inputMediaUrl,
             string jobName);
 
-        Task<(JobState, IEnumerable<string>)> GetAmsJobStatusAndOutputLabels(
-           string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
-           string jobName);
+        Task<(string storageAccountName, string container)> GetAssetDetails(
+            string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
+            string assetName);
     }
 
     public class MediaServicesJobService : IMediaServicesJobService
@@ -43,7 +44,7 @@ namespace AmsHighAvailability.Services
             new TransformOutput(new AudioAnalyzerPreset("en-US"))
         };
 
-        public async Task<bool> SubmitJobToMediaServicesEndpointAsync(
+        public async Task<(bool success, IEnumerable<AmsAsset> assets)> SubmitJobToMediaServicesEndpointAsync(
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
             string inputMediaUrl,
             string jobName)
@@ -54,18 +55,25 @@ namespace AmsHighAvailability.Services
             await GetOrCreateTransformAsync(client, resourceGroupName, mediaServicesInstanceName, AdaptiveStreamingTransformName);
 
             // Create output assets to receive the job outputs.
-            var outputAssetNames = new string[Outputs.Length];
+            var outputAssets = new List<AmsAsset>();
             for (var i = 0; i < Outputs.Length; i++)
             {
-                outputAssetNames[i] = $"{jobName}|{i}";
-                await CreateOutputAssetAsync(client, resourceGroupName, mediaServicesInstanceName, outputAssetNames[i]);
+                var assetName = $"{jobName}|{i}";
+                var asset = await CreateOutputAssetAsync(client, resourceGroupName, mediaServicesInstanceName, assetName);
+                outputAssets.Add(new AmsAsset
+                {
+                    StorageAccountName = asset.StorageAccountName,
+                    Container = asset.Container,
+                    Name = asset.Name
+                });
             }
 
             // Submit the job to Media Services.
             try
             {
-                var job = await SubmitJobAsync(client, resourceGroupName, mediaServicesInstanceName, AdaptiveStreamingTransformName, outputAssetNames, jobName, inputMediaUrl);
-                return job.State == JobState.Queued || job.State == JobState.Scheduled;
+                var job = await SubmitJobAsync(client, resourceGroupName, mediaServicesInstanceName, AdaptiveStreamingTransformName, outputAssets.Select(a => a.Name).ToArray(), jobName, inputMediaUrl);
+                var success = job.State == JobState.Queued || job.State == JobState.Scheduled;
+                return (success, outputAssets);
             }
             catch (ApiErrorException ex)
             {
@@ -73,19 +81,16 @@ namespace AmsHighAvailability.Services
             }
         }
 
-        public async Task<(JobState, IEnumerable<string>)> GetAmsJobStatusAndOutputLabels(
+        public async Task<(string storageAccountName, string container)> GetAssetDetails(
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
-            string jobName)
+            string assetName)
         {
             var client = await GetAzureMediaServicesClient(subscriptionId);
 
-            // Retrieve the job and map the state and output labels to return value.
-            var job = await client.Jobs.GetAsync(
+            var asset = await client.Assets.GetAsync(
                 resourceGroupName, mediaServicesInstanceName,
-                AdaptiveStreamingTransformName,
-                jobName);
-            var outputLabels = job.Outputs.Select(o => o.Label);
-            return (job.State, outputLabels);
+                assetName);
+            return (asset.StorageAccountName, asset.Container);
         }
 
         private async Task<AzureMediaServicesClient> GetAzureMediaServicesClient(string subscriptionId)
