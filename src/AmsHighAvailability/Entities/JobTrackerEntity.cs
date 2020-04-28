@@ -132,21 +132,16 @@ namespace AmsHighAvailability.Entities
             // Signal the coordinator that we have an update.
             _log.LogInformation("Job tracker is updating job coordinator. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobCoordinatorEntityId={JobCoordinatorEntityId}, Status={Status}",
                 JobCoordinatorEntityId, JobTrackerEntityId, JobCoordinatorEntityId, CurrentStatus);
-            // TODO consider having single JobCoordinatorEntity method to receive all status updates, rather than doing a switch here?
-
-            switch (CurrentStatus)
+            
+            if (CurrentStatus == AmsStatus.Succeeded)
             {
-                case AmsStatus.TimedOut:
-                    Entity.Current.SignalEntity<IJobCoordinatorEntity>(new EntityId(nameof(JobCoordinatorEntity), JobCoordinatorEntityId), proxy => proxy.MarkTrackerAsTimedOut(JobTrackerEntityId));
-                    break;
-                case AmsStatus.Succeeded:
-                    // Get the latest details about the job's output assets so we can send them back in API responses.
-                    await UpdateAssets();
-                    Entity.Current.SignalEntity<IJobCoordinatorEntity>(new EntityId(nameof(JobCoordinatorEntity), JobCoordinatorEntityId), proxy => proxy.MarkTrackerAsSucceeded((JobTrackerEntityId, Assets)));
-                    break;
-                case AmsStatus.Failed:
-                    Entity.Current.SignalEntity<IJobCoordinatorEntity>(new EntityId(nameof(JobCoordinatorEntity), JobCoordinatorEntityId), proxy => proxy.MarkTrackerAsFailed(JobTrackerEntityId));
-                    break;
+                // Get the latest details about the job's output assets so we can send them back in API responses.
+                await UpdateAssets();
+                Entity.Current.SignalEntity<IJobCoordinatorEntity>(new EntityId(nameof(JobCoordinatorEntity), JobCoordinatorEntityId), proxy => proxy.MarkTrackerAsSucceeded((JobTrackerEntityId, Assets)));
+            }
+            else
+            {
+                Entity.Current.SignalEntity<IJobCoordinatorEntity>(new EntityId(nameof(JobCoordinatorEntity), JobCoordinatorEntityId), proxy => proxy.MarkTrackerAsFailed((JobTrackerEntityId, CurrentStatus)));
             }
         }
 

@@ -16,12 +16,8 @@ namespace AmsHighAvailability.Entities
         void Start(string inputMediaFileUrl);
 
         void MarkTrackerAsSucceeded((string jobTrackerEntityId, IEnumerable<AmsAsset> assets) arguments);
-                 
-        void MarkTrackerAsCanceled(string jobTrackerEntityId);
-                 
-        void MarkTrackerAsFailed(string jobTrackerEntityId);
-                 
-        void MarkTrackerAsTimedOut(string jobTrackerEntityId);
+
+        void MarkTrackerAsFailed((string jobTrackerEntityId, AmsStatus jobStatus) arguments);
     }
 
     [JsonObject(MemberSerialization.OptIn)]
@@ -111,35 +107,12 @@ namespace AmsHighAvailability.Entities
             };
         }
 
-        public void MarkTrackerAsCanceled(string jobTrackerEntityId)
+        public void MarkTrackerAsFailed((string jobTrackerEntityId, AmsStatus jobStatus) arguments)
         {
-            _log.LogInformation("Job tracker has been canceled. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={jobTrackerEntityId}",
-                JobCoordinatorEntityId, jobTrackerEntityId);
+            _log.LogInformation("Job tracker has entered terminal status. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={jobTrackerEntityId}, JobStatus={jobStatus}",
+                JobCoordinatorEntityId, arguments.jobTrackerEntityId, arguments.jobStatus);
 
-            var newTrackerStarted = StartTracker();
-            if (!newTrackerStarted)
-            {
-                UpdateStatus(JobStatus.Failed);
-            }
-        }
-
-        public void MarkTrackerAsFailed(string jobTrackerEntityId)
-        {
-            _log.LogInformation("Job tracker has failed. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={jobTrackerEntityId}",
-                JobCoordinatorEntityId, jobTrackerEntityId);
-
-            var newTrackerStarted = StartTracker();
-            if (!newTrackerStarted)
-            {
-                UpdateStatus(JobStatus.Failed);
-            }
-        }
-
-        public void MarkTrackerAsTimedOut(string jobTrackerEntityId)
-        {
-            _log.LogInformation("Job tracker has timed out. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={jobTrackerEntityId}",
-                JobCoordinatorEntityId, jobTrackerEntityId);
-
+            // Try to restart the job, and if it doesn't work, we consider the whole job to have failed.
             var newTrackerStarted = StartTracker();
             if (!newTrackerStarted)
             {
