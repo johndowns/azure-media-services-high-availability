@@ -79,11 +79,10 @@ namespace AmsHighAvailability.Entities
             if (!trackerStarted)
             {
                 UpdateStatus(JobStatus.Failed);
+                return;
             }
-            else
-            {
-                Status = JobStatus.Processing;
-            }
+
+            Status = JobStatus.Processing;
         }
 
         private void UpdateStatus(JobStatus newJobStatus)
@@ -95,7 +94,7 @@ namespace AmsHighAvailability.Entities
 
         public void MarkTrackerAsSucceeded((string jobTrackerEntityId, IEnumerable<AmsAsset> assets) arguments)
         {
-            _log.LogInformation("Job tracker has succeeded. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={jobTrackerEntityId}",
+            _log.LogInformation("Job tracker has succeeded; marking job coordinator as succeeded. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={jobTrackerEntityId}",
                 JobCoordinatorEntityId, arguments.jobTrackerEntityId);
             UpdateStatus(JobStatus.Succeeded);
 
@@ -116,6 +115,8 @@ namespace AmsHighAvailability.Entities
             var newTrackerStarted = StartTracker();
             if (!newTrackerStarted)
             {
+                _log.LogInformation("Unable to start a new tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}",
+                    JobCoordinatorEntityId);
                 UpdateStatus(JobStatus.Failed);
             }
         }
@@ -142,7 +143,7 @@ namespace AmsHighAvailability.Entities
 
         private string SelectAmsInstanceId()
         {
-            // If we are using regional affinity then prefer using the primary region if possible.
+            // If we are using regional affinity then prefer using the primary region if it hasn't already been used.
             if (_settings.AmsInstanceRoutingMethod == AmsInstanceRoutingMethod.RegionalAffinity)
             {
                 if (!Trackers.Any(a => a.amsInstanceId == _settings.PrimaryAmsInstanceId))
@@ -157,7 +158,7 @@ namespace AmsHighAvailability.Entities
             {
                 return allRemainingAmsInstances
                     .Skip(_random.Next(allRemainingAmsInstances.Count()))
-                    .Take(1).Single();
+                    .First();
             }
 
             // There are no more AMS instances available, so we can't start a new tracker.
