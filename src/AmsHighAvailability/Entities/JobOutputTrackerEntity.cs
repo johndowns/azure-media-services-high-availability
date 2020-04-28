@@ -72,7 +72,7 @@ namespace AmsHighAvailability.Entities
                     _log.LogInformation("Updating job tracker status from output tracker's status change. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Time={StatusTime}, JobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
                         JobCoordinatorEntityId, JobTrackerEntityId, JobOutputTrackerEntityId, arguments.statusTime, arguments.newStatus, arguments.progress);
                     var entityId = new EntityId(nameof(JobTrackerEntity), JobTrackerEntityId);
-                    Entity.Current.SignalEntity<IJobTracker>(entityId, proxy => proxy.OutputStatusUpdate(arguments.statusTime));
+                    Entity.Current.SignalEntity<IJobTracker>(entityId, proxy => proxy.ReceivePushOutputStatusUpdate(arguments.statusTime));
                 }
             }
         }

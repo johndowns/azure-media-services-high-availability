@@ -42,7 +42,7 @@ namespace AmsHighAvailability
             log.LogInformation("Updating job tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobTrackerStatus={JobTrackerStatus}, StatusTime={StatusTime}",
                 jobTrackerEntityId, jobTrackerStatus, statusTime);
             var entityId = new EntityId(nameof(JobTrackerEntity), jobTrackerEntityId);
-            await durableEntityClient.SignalEntityAsync<IJobTracker>(entityId, proxy => proxy.StatusUpdate((jobTrackerStatus, statusTime)));
+            await durableEntityClient.SignalEntityAsync<IJobTracker>(entityId, proxy => proxy.ReceivePushStatusUpdate((jobTrackerStatus, statusTime)));
         }
 
         [FunctionName("AmsJobOutputStatusUpdate")]

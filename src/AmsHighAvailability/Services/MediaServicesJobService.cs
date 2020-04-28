@@ -20,6 +20,10 @@ namespace AmsHighAvailability.Services
         Task<(string storageAccountName, string container)> GetAssetDetails(
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
             string assetName);
+
+        Task GetJobStatus(
+            string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
+            string jobName);
     }
 
     public class MediaServicesJobService : IMediaServicesJobService
@@ -49,7 +53,7 @@ namespace AmsHighAvailability.Services
             string inputMediaUrl,
             string jobName)
         {
-            var client = await GetAzureMediaServicesClient(subscriptionId);
+            var client = await GetAzureMediaServicesClient(subscriptionId); // TODO should this be reused?
 
             // Ensure the transform profile exists.
             await GetOrCreateTransformAsync(client, resourceGroupName, mediaServicesInstanceName, AdaptiveStreamingTransformName);
@@ -85,12 +89,24 @@ namespace AmsHighAvailability.Services
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
             string assetName)
         {
-            var client = await GetAzureMediaServicesClient(subscriptionId);
+            var client = await GetAzureMediaServicesClient(subscriptionId); // TODO should this be reused?
 
             var asset = await client.Assets.GetAsync(
                 resourceGroupName, mediaServicesInstanceName,
                 assetName);
             return (asset.StorageAccountName, asset.Container);
+        }
+
+        public async Task GetJobStatus(
+            string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
+            string jobName)
+        {
+            var client = await GetAzureMediaServicesClient(subscriptionId); // TODO should this be reused?
+
+            var job = await client.Jobs.GetAsync(
+                resourceGroupName, mediaServicesInstanceName,
+                AdaptiveStreamingTransformName, jobName);
+            job.Outputs.Select(o => new { o.Progress, o.State, o.Label }); // TODO
         }
 
         private async Task<AzureMediaServicesClient> GetAzureMediaServicesClient(string subscriptionId)
@@ -146,7 +162,7 @@ namespace AmsHighAvailability.Services
             // Change the URL to any accessible HTTPs URL or SAS URL from Azure.
             var jobInput = new JobInputHttp(files: new[] { inputMediaUrl });
 
-            JobOutput[] jobOutputs = outputAssetNames.Select(n => new JobOutputAsset(n)).ToArray();
+            JobOutput[] jobOutputs = outputAssetNames.Select(n => new JobOutputAsset(n, label: n)).ToArray();
 
             // In this example, we are assuming that the job name is unique.
             //
