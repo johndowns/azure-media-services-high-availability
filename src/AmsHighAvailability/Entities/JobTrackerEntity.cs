@@ -211,7 +211,6 @@ namespace AmsHighAvailability.Entities
                 return;
             }
 
-            // TODO update logic - this should look at the last time we received an update, not the last time progress was made
             if (LastTimeSeenStatusUpdate < DateTime.UtcNow.Subtract(_settings.JobTrackerTimeoutThreshold)) // TODO setting name
             {
                 // We haven't seen any updates from this job recently, so we need to trigger a manual poll of the job status.
