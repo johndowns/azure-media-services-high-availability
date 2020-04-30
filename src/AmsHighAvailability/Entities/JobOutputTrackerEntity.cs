@@ -11,7 +11,7 @@ namespace AmsHighAvailability.Entities
 {
     public interface IJobOutputTrackerEntity
     {
-        void ReceiveStatusUpdate((AmsStatus newStatus, int progress, DateTimeOffset statusTime) arguments); // TODO rename
+        void ReceiveStatusUpdate((ExtendedJobState newStatus, int progress, DateTimeOffset statusTime) arguments); // TODO rename
     }
 
     public class JobOutputTrackerEntity : IJobOutputTrackerEntity
@@ -26,7 +26,7 @@ namespace AmsHighAvailability.Entities
         public string JobOutputTrackerEntityId => Entity.Current.EntityKey;
 
         [JsonProperty("status")]
-        public AmsStatus CurrentStatus { get; set; } = AmsStatus.Submitted;
+        public ExtendedJobState CurrentStatus { get; set; } = ExtendedJobState.Submitted;
 
         [JsonProperty("currentProgress")]
         public int CurrentProgress { get; set; } = 0;
@@ -48,7 +48,7 @@ namespace AmsHighAvailability.Entities
         public static Task Run([EntityTrigger] IDurableEntityContext ctx, ILogger log)
             => ctx.DispatchAsync<JobOutputTrackerEntity>(log);
 
-        public void ReceiveStatusUpdate((AmsStatus newStatus, int progress, DateTimeOffset statusTime) arguments)
+        public void ReceiveStatusUpdate((ExtendedJobState newStatus, int progress, DateTimeOffset statusTime) arguments)
         {
             _log.LogInformation("Received status update for job output tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Time={StatusTime}, JobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
                 JobCoordinatorEntityId, JobTrackerEntityId, JobOutputTrackerEntityId, arguments.statusTime, arguments.newStatus, arguments.progress);
@@ -56,8 +56,8 @@ namespace AmsHighAvailability.Entities
 
             // If we see the status move from 'Received' to something else, or from 'Processing'
             // to something else, or we see the progress increase, then we count this as progress.
-            if ((CurrentStatus == AmsStatus.Submitted && arguments.newStatus != AmsStatus.Submitted) ||
-                (CurrentStatus == AmsStatus.Processing && arguments.newStatus != AmsStatus.Processing) ||
+            if ((CurrentStatus == ExtendedJobState.Submitted && arguments.newStatus != ExtendedJobState.Submitted) ||
+                (CurrentStatus == ExtendedJobState.Processing && arguments.newStatus != ExtendedJobState.Processing) ||
                 (arguments.progress > CurrentProgress))
             {
                 if (LastTimeSeenJobOutputProgress == null ||

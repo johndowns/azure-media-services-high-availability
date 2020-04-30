@@ -60,7 +60,7 @@ namespace AmsHighAvailability
                 MediaFileUrl = entityState.EntityState.InputMediaFileUrl
             };
 
-            if (entityState.EntityState.Status == AmsStatus.Succeeded)
+            if (entityState.EntityState.Status == ExtendedJobState.Succeeded)
             {
                 response.Outputs = new JobOutputsResponse
                 {

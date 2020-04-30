@@ -1,6 +1,5 @@
 // Default URL for triggering event grid function in the local environment.
 // http://localhost:7071/runtime/webhooks/EventGrid?functionName={functionname}
-using System;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.EventGrid.Models;
 using Microsoft.Azure.WebJobs.Extensions.EventGrid;
@@ -12,7 +11,6 @@ using AmsHighAvailability.Models;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Microsoft.Azure.Management.Media.Models;
 
 namespace AmsHighAvailability
 {
@@ -34,11 +32,11 @@ namespace AmsHighAvailability
             var statusTime = eventGridEvent.EventTime;
 
             var eventData = ((JObject)eventGridEvent.Data).ToObject<JobStateChangeEventData>();
-            var jobTrackerStatus = eventData.State.ToAmsStatus();
+            var jobTrackerStatus = eventData.State.ToExtendedJobState();
 
             // We don't need to listen for status messages where the job has been queued or scheduled.
             // We aren't interested until the job actually starts getting processed.
-            if (jobTrackerStatus == AmsStatus.Submitted) return;
+            if (jobTrackerStatus == ExtendedJobState.Submitted) return;
 
             log.LogInformation("Updating job tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobTrackerStatus={JobTrackerStatus}, StatusTime={StatusTime}",
                 jobTrackerEntityId, jobTrackerStatus, statusTime);
@@ -62,11 +60,11 @@ namespace AmsHighAvailability
             var eventData = ((JObject)eventGridEvent.Data).ToObject<JobOutputStateChangeEventData>();
             var jobOutputTrackerEntityId = eventData.Output.AssetName;
             var jobOutputTrackerProgress = eventData.Output.Progress;
-            var jobOutputTrackerStatus = eventData.Output.State.ToAmsStatus();
+            var jobOutputTrackerStatus = eventData.Output.State.ToExtendedJobState();
 
             // We don't need to listen for status messages where the job has been queued or scheduled.
             // We aren't interested until the job actually starts getting processed.
-            if (jobOutputTrackerStatus == AmsStatus.Submitted) return;
+            if (jobOutputTrackerStatus == ExtendedJobState.Submitted) return;
 
             log.LogInformation("Updating job output tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, jobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}, StatusTime={StatusTime}",
                 jobOutputTrackerEntityId, jobTrackerEntityId, jobOutputTrackerStatus, jobOutputTrackerProgress, statusTime);

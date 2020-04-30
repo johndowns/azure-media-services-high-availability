@@ -1,6 +1,6 @@
 ﻿namespace AmsHighAvailability.Models
 {
-    public enum AmsStatus // TODO rename to ExtendedJobState?
+    public enum ExtendedJobState
     {
         Submitted,
         Processing,

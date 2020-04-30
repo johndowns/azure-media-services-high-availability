@@ -109,12 +109,12 @@ namespace AmsHighAvailability.Services
             var outputStates = job.Outputs.Select(o => new AmsJobOutputCurrentState
             {
                 Label = o.Label,
-                State = o.State.ToAmsStatus(),
+                State = o.State.ToExtendedJobState(),
                 Progress = o.Progress
             });
             return new AmsJobCurrentState
             {
-                State = job.State.ToAmsStatus(),
+                State = job.State.ToExtendedJobState(),
                 OutputStates = outputStates
             };            
         }
@@ -194,7 +194,7 @@ namespace AmsHighAvailability.Services
 
     public class AmsJobCurrentState
     {
-        public AmsStatus State { get; set; }
+        public ExtendedJobState State { get; set; }
 
         public IEnumerable<AmsJobOutputCurrentState> OutputStates { get; set; }
     }
@@ -203,7 +203,7 @@ namespace AmsHighAvailability.Services
     {
         public string Label { get; set; }
 
-        public AmsStatus State { get; set; }
+        public ExtendedJobState State { get; set; }
 
         public int Progress { get; set; }
     }

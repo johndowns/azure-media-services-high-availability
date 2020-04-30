@@ -6,23 +6,23 @@ namespace AmsHighAvailability
 {
     public static class JobStateExtensions
     {
-        public static AmsStatus ToAmsStatus(this JobState state)
+        public static ExtendedJobState ToExtendedJobState(this JobState state)
         {
             if (state == JobState.Queued || state == JobState.Scheduled)
             {
-                return AmsStatus.Submitted;
+                return ExtendedJobState.Submitted;
             }
             if (state == JobState.Processing)
             {
-                return AmsStatus.Processing;
+                return ExtendedJobState.Processing;
             }
             if (state == JobState.Finished)
             {
-                return AmsStatus.Succeeded;
+                return ExtendedJobState.Succeeded;
             }
             if (state == JobState.Error || state == JobState.Canceling || state == JobState.Canceled)
             {
-                return AmsStatus.Failed;
+                return ExtendedJobState.Failed;
             }
 
             throw new InvalidOperationException($"Unexpected value for event state: {state}");
