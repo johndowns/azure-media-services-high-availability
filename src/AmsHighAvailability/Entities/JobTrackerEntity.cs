@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -199,6 +200,7 @@ namespace AmsHighAvailability.Entities
 
         public async Task CheckIfJobStateIsCurrent()
         {
+            // TODO try using Activity.Current.Tags
             _log.LogInformation("Checking whether job tracker has a current job state. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, LastTimeSeenJobProgress={LastTimeSeenJobProgress}",
                 JobCoordinatorEntityId, JobTrackerEntityId, LastTimeSeenJobProgress);
 
@@ -213,6 +215,9 @@ namespace AmsHighAvailability.Entities
             if (LastTimeSeenStatusUpdate < DateTime.UtcNow.Subtract(_settings.JobTrackerCurrencyThreshold))
             {
                 // We haven't seen any updates from this job recently, so we need to trigger a manual poll of the job status.
+                _log.LogInformation("Pulling job state. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, LastTimeSeenJobProgress={LastTimeSeenJobProgress}",
+                    JobCoordinatorEntityId, JobTrackerEntityId, LastTimeSeenJobProgress);
+
                 var retrievedTime = DateTimeOffset.UtcNow;
                 var jobCurrentState = await _mediaServicesJobService.GetJobStatus(
                     AmsInstanceConfiguration.MediaServicesSubscriptionId, AmsInstanceConfiguration.MediaServicesResourceGroupName, AmsInstanceConfiguration.MediaServicesInstanceName,
@@ -221,10 +226,10 @@ namespace AmsHighAvailability.Entities
                 // We then send the updates back to the relevant entities through the standard status notification process.
                 Entity.Current.SignalEntity<IJobTrackerEntity>(Entity.Current.EntityId, proxy => proxy.ReceiveStatusUpdate((jobCurrentState.State, retrievedTime)));
 
-                // TODO check labels are the entity ID
                 foreach (var outputState in jobCurrentState.OutputStates)
                 {
-                    Entity.Current.SignalEntity<IJobOutputTrackerEntity>(new EntityId(nameof(JobTrackerEntity), outputState.Label), proxy => proxy.ReceiveStatusUpdate((outputState.State, outputState.Progress, retrievedTime)));
+                    _log.LogInformation($"TODO signalling entity {outputState.Label}"); // TODO check labels are the entity ID (they should be)
+                    Entity.Current.SignalEntity<IJobOutputTrackerEntity>(new EntityId(nameof(JobOutputTrackerEntity), outputState.Label), proxy => proxy.ReceiveStatusUpdate((outputState.State, outputState.Progress, retrievedTime)));
                 }
             }
         }

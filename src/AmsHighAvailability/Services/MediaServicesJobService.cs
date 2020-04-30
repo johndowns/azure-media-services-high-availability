@@ -166,7 +166,7 @@ namespace AmsHighAvailability.Services
         private async Task<Job> SubmitJobAsync(
             IAzureMediaServicesClient client,
             string resourceGroupName, string mediaServicesInstanceName,
-            string transformName,string[] outputAssetNames, string jobName, string inputMediaUrl)
+            string transformName, string[] outputAssetNames, string jobName, string inputMediaUrl)
         {
             // This example shows how to encode from any HTTPs source URL - a new feature of the v3 API.  
             // Change the URL to any accessible HTTPs URL or SAS URL from Azure.
