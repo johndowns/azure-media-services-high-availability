@@ -6,7 +6,9 @@ $amsInstances = @(
     @{ instanceId = "aus"; location = "australiaeast" },
     @{ instanceId = "eus"; location = "eastus2" }
 )
-$jobTrackerStatusTimeoutCheckInterval = '00:05:00'
+$jobTrackerCurrencyCheckInterval = '00:03:00'
+$jobTrackerCurrencyThreshold = '00:05:00'
+$jobTrackerTimeoutCheckInterval = '00:05:00'
 $jobTrackerTimeoutThreshold = '01:00:00'
 $amsInstanceRoutingMethod = 'Random'
 
@@ -48,7 +50,9 @@ foreach ($kvp in $functionAppSettings)
     $functionAppSettingsHash[$kvp.Name] = $kvp.Value
 }
 
-$functionAppSettingsHash['Options:JobTrackerStatusTimeoutCheckInterval'] = $jobTrackerStatusTimeoutCheckInterval
+$functionAppSettingsHash['Options:JobTrackerCurrencyCheckInterval'] = $jobTrackerCurrencyCheckInterval
+$functionAppSettingsHash['Options:JobTrackerCurrencyThreshold'] = $jobTrackerCurrencyThreshold
+$functionAppSettingsHash['Options:JobTrackerTimeoutCheckInterval'] = $jobTrackerTimeoutCheckInterval
 $functionAppSettingsHash['Options:JobTrackerTimeoutThreshold'] = $jobTrackerTimeoutThreshold
 $functionAppSettingsHash['Options:AmsInstanceRoutingMethod'] = $amsInstanceRoutingMethod
 

@@ -26,7 +26,7 @@ namespace AmsHighAvailability.Entities
         public string JobOutputTrackerEntityId => Entity.Current.EntityKey;
 
         [JsonProperty("status")]
-        public AmsStatus CurrentStatus { get; set; } = AmsStatus.Received;
+        public AmsStatus CurrentStatus { get; set; } = AmsStatus.Submitted;
 
         [JsonProperty("currentProgress")]
         public int CurrentProgress { get; set; } = 0;
@@ -56,7 +56,7 @@ namespace AmsHighAvailability.Entities
 
             // If we see the status move from 'Received' to something else, or from 'Processing'
             // to something else, or we see the progress increase, then we count this as progress.
-            if ((CurrentStatus == AmsStatus.Received && arguments.newStatus != AmsStatus.Received) ||
+            if ((CurrentStatus == AmsStatus.Submitted && arguments.newStatus != AmsStatus.Submitted) ||
                 (CurrentStatus == AmsStatus.Processing && arguments.newStatus != AmsStatus.Processing) ||
                 (arguments.progress > CurrentProgress))
             {

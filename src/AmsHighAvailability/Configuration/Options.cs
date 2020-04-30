@@ -5,9 +5,13 @@ namespace AmsHighAvailability.Configuration
 {
     public class Options
     {
-        public TimeSpan JobTrackerStatusTimeoutCheckInterval { get; set; } // How often we check whether the tracker has timed out.
+        public TimeSpan JobTrackerCurrencyCheckInterval { get; set; } // How often we check whether the tracker has received a recent progress update from Azure Media Services.
 
-        public TimeSpan JobTrackerTimeoutThreshold { get; set; } // How long the job tracker has to have gone without a status update before it is considered to have timed out.
+        public TimeSpan JobTrackerCurrencyThreshold { get; set; } // How long the job tracker has to have gone without getting any updates from Azure Media Services before it polls for an update.
+
+        public TimeSpan JobTrackerTimeoutCheckInterval { get; set; } // How often we check whether the tracker has timed out.
+
+        public TimeSpan JobTrackerTimeoutThreshold { get; set; } // How long the job tracker has to have gone without seeing any job progress before it is considered to have timed out.
 
         public AmsInstanceRoutingMethod AmsInstanceRoutingMethod { get; set; }
 

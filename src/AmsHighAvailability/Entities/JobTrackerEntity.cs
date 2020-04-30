@@ -109,11 +109,11 @@ namespace AmsHighAvailability.Entities
                 JobCoordinatorEntityId, JobTrackerEntityId, AmsInstanceId);
 
             // Update our internal bookkeeping to track the fact that the job has just been submitted.
+            var timeJobSubmitted = DateTime.UtcNow;
             Assets = assets;
             await UpdateCurrentStatus(AmsStatus.Processing);
-            var timeJobSubmitted = DateTime.UtcNow;
             LastTimeSeenJobProgress = timeJobSubmitted;
-            StatusHistory.Add(new JobTrackerStatusHistory { Status = AmsStatus.Received, StatusTime = timeJobSubmitted, TimeReceived = timeJobSubmitted });
+            StatusHistory.Add(new JobTrackerStatusHistory { Status = AmsStatus.Submitted, StatusTime = timeJobSubmitted, TimeReceived = timeJobSubmitted });
 
             // Schedule the checks we need to perform to detect state update failures and job timeouts.
             ScheduleNextJobStateCurrencyCheck();
@@ -124,7 +124,7 @@ namespace AmsHighAvailability.Entities
         {
             CurrentStatus = status;
 
-            if (CurrentStatus == AmsStatus.Received || CurrentStatus == AmsStatus.Processing)
+            if (CurrentStatus == AmsStatus.Submitted || CurrentStatus == AmsStatus.Processing)
             {
                 return;
             }
@@ -165,7 +165,7 @@ namespace AmsHighAvailability.Entities
             StatusHistory.Add(new JobTrackerStatusHistory { Status = arguments.newStatus, StatusTime = arguments.statusTime, TimeReceived = DateTimeOffset.Now });
 
             // If this status update shows the job has made some progress, we will mark it as the current status and update the job accordingly.
-            if ((CurrentStatus == AmsStatus.Received && arguments.newStatus != AmsStatus.Received) ||
+            if ((CurrentStatus == AmsStatus.Submitted && arguments.newStatus != AmsStatus.Submitted) ||
                 (CurrentStatus == AmsStatus.Processing && arguments.newStatus != AmsStatus.Processing))
             {
                 if (arguments.statusTime > LastTimeSeenJobProgress)
@@ -191,7 +191,7 @@ namespace AmsHighAvailability.Entities
                 return;
             }
 
-            var statusTimeoutTimeUtc = DateTime.UtcNow.Add(_settings.JobTrackerStatusTimeoutCheckInterval); // TODO rename setting
+            var statusTimeoutTimeUtc = DateTime.UtcNow.Add(_settings.JobTrackerCurrencyCheckInterval);
             Entity.Current.SignalEntity<IJobTracker>(Entity.Current.EntityId, statusTimeoutTimeUtc, proxy => proxy.CheckIfJobStateIsCurrent());
 
             _log.LogInformation("Scheduled tracker to check if the job state is current. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CheckTime={CheckTime}",
@@ -211,7 +211,7 @@ namespace AmsHighAvailability.Entities
                 return;
             }
 
-            if (LastTimeSeenStatusUpdate < DateTime.UtcNow.Subtract(_settings.JobTrackerTimeoutThreshold)) // TODO setting name
+            if (LastTimeSeenStatusUpdate < DateTime.UtcNow.Subtract(_settings.JobTrackerCurrencyThreshold))
             {
                 // We haven't seen any updates from this job recently, so we need to trigger a manual poll of the job status.
                 //var jobStatus = await _mediaServicesJobService.GetJobStatus(
@@ -230,7 +230,7 @@ namespace AmsHighAvailability.Entities
                 return;
             }
 
-            var statusTimeoutTimeUtc = DateTime.UtcNow.Add(_settings.JobTrackerStatusTimeoutCheckInterval); // TODO rename setting
+            var statusTimeoutTimeUtc = DateTime.UtcNow.Add(_settings.JobTrackerTimeoutCheckInterval);
             Entity.Current.SignalEntity<IJobTracker>(Entity.Current.EntityId, statusTimeoutTimeUtc, proxy => proxy.CheckIfJobHasTimedOut());
 
             _log.LogInformation("Scheduled tracker to check if the job has timed out. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CheckTime={CheckTime}",
@@ -250,7 +250,7 @@ namespace AmsHighAvailability.Entities
                 return;
             }
 
-            if (LastTimeSeenJobProgress < DateTime.UtcNow.Subtract(_settings.JobTrackerTimeoutThreshold)) // TODO setting name
+            if (LastTimeSeenJobProgress < DateTime.UtcNow.Subtract(_settings.JobTrackerTimeoutThreshold))
             {
                 // It has been too long since we have seen any progress being made on the job.
                 // This means we consider the job to have timed out.

@@ -37,7 +37,7 @@ namespace AmsHighAvailability
 
             // We don't need to listen for status messages where the job has been queued or scheduled.
             // We aren't interested until the job actually starts getting processed.
-            if (jobTrackerStatus == AmsStatus.Received) return;
+            if (jobTrackerStatus == AmsStatus.Submitted) return;
 
             log.LogInformation("Updating job tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobTrackerStatus={JobTrackerStatus}, StatusTime={StatusTime}",
                 jobTrackerEntityId, jobTrackerStatus, statusTime);
@@ -65,7 +65,7 @@ namespace AmsHighAvailability
 
             // We don't need to listen for status messages where the job has been queued or scheduled.
             // We aren't interested until the job actually starts getting processed.
-            if (jobOutputTrackerStatus == AmsStatus.Received) return;
+            if (jobOutputTrackerStatus == AmsStatus.Submitted) return;
 
             log.LogInformation("Updating job output tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, jobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}, StatusTime={StatusTime}",
                 jobOutputTrackerEntityId, jobTrackerEntityId, jobOutputTrackerStatus, jobOutputTrackerProgress, statusTime);
@@ -87,7 +87,7 @@ namespace AmsHighAvailability
             {
                 case "Queued":
                 case "Scheduled":
-                    return AmsStatus.Received;
+                    return AmsStatus.Submitted;
                 case "Processing":
                     return AmsStatus.Processing;
                 case "Finished":

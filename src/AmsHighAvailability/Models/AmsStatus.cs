@@ -2,7 +2,7 @@
 {
     public enum AmsStatus
     {
-        Received,
+        Submitted,
         Processing,
         Succeeded,
         Failed,
