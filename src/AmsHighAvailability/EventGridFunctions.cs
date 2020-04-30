@@ -12,6 +12,7 @@ using AmsHighAvailability.Models;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Microsoft.Azure.Management.Media.Models;
 
 namespace AmsHighAvailability
 {
@@ -33,7 +34,7 @@ namespace AmsHighAvailability
             var statusTime = eventGridEvent.EventTime;
 
             var eventData = ((JObject)eventGridEvent.Data).ToObject<JobStateChangeEventData>();
-            var jobTrackerStatus = GetAmsStatusFromEventState(eventData.State);
+            var jobTrackerStatus = eventData.State.ToAmsStatus();
 
             // We don't need to listen for status messages where the job has been queued or scheduled.
             // We aren't interested until the job actually starts getting processed.
@@ -42,7 +43,7 @@ namespace AmsHighAvailability
             log.LogInformation("Updating job tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobTrackerStatus={JobTrackerStatus}, StatusTime={StatusTime}",
                 jobTrackerEntityId, jobTrackerStatus, statusTime);
             var entityId = new EntityId(nameof(JobTrackerEntity), jobTrackerEntityId);
-            await durableEntityClient.SignalEntityAsync<IJobTracker>(entityId, proxy => proxy.ReceivePushStatusUpdate((jobTrackerStatus, statusTime)));
+            await durableEntityClient.SignalEntityAsync<IJobTrackerEntity>(entityId, proxy => proxy.ReceiveStatusUpdate((jobTrackerStatus, statusTime)));
         }
 
         [FunctionName("AmsJobOutputStatusUpdate")]
@@ -61,7 +62,7 @@ namespace AmsHighAvailability
             var eventData = ((JObject)eventGridEvent.Data).ToObject<JobOutputStateChangeEventData>();
             var jobOutputTrackerEntityId = eventData.Output.AssetName;
             var jobOutputTrackerProgress = eventData.Output.Progress;
-            var jobOutputTrackerStatus = GetAmsStatusFromEventState(eventData.Output.State);
+            var jobOutputTrackerStatus = eventData.Output.State.ToAmsStatus();
 
             // We don't need to listen for status messages where the job has been queued or scheduled.
             // We aren't interested until the job actually starts getting processed.
@@ -70,7 +71,7 @@ namespace AmsHighAvailability
             log.LogInformation("Updating job output tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, jobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}, StatusTime={StatusTime}",
                 jobOutputTrackerEntityId, jobTrackerEntityId, jobOutputTrackerStatus, jobOutputTrackerProgress, statusTime);
             var entityId = new EntityId(nameof(JobOutputTrackerEntity), jobOutputTrackerEntityId);
-            await durableEntityClient.SignalEntityAsync<IJobOutputTrackerEntity>(entityId, proxy => proxy.StatusUpdate((jobOutputTrackerStatus, jobOutputTrackerProgress, statusTime)));
+            await durableEntityClient.SignalEntityAsync<IJobOutputTrackerEntity>(entityId, proxy => proxy.ReceiveStatusUpdate((jobOutputTrackerStatus, jobOutputTrackerProgress, statusTime)));
         }
 
         private static string GetJobTrackerEntityIdFromEventSubject(string eventSubject)
@@ -80,33 +81,13 @@ namespace AmsHighAvailability
 
             return match.Groups[1].Value;
         }
-
-        private static AmsStatus GetAmsStatusFromEventState(string state)
-        {
-            switch (state)
-            {
-                case "Queued":
-                case "Scheduled":
-                    return AmsStatus.Submitted;
-                case "Processing":
-                    return AmsStatus.Processing;
-                case "Finished":
-                    return AmsStatus.Succeeded;
-                case "Error":
-                case "Canceling":
-                case "Canceled":
-                    return AmsStatus.Failed;
-                default:
-                    throw new InvalidOperationException($"Unexpected value for event state: {state}");
-            }
-        }
     }
 
     #region Event Grid schema types
     public class JobStateChangeEventData
     {
         [JsonProperty("state")]
-        public string State { get; set; }
+        public Microsoft.Azure.Management.Media.Models.JobState State { get; set; }
     }
 
     public class JobOutputStateChangeEventData
@@ -123,7 +104,7 @@ namespace AmsHighAvailability
             public int Progress { get; set; }
 
             [JsonProperty("state")]
-            public string State { get; set; }
+            public Microsoft.Azure.Management.Media.Models.JobState State { get; set; }
         }
     }
     #endregion

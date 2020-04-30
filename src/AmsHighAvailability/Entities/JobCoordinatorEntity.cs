@@ -36,7 +36,7 @@ namespace AmsHighAvailability.Entities
         public DateTimeOffset? CompletedTime { get; set; }
 
         [JsonProperty("status")]
-        public JobStatus Status { get; set; }
+        public AmsStatus Status { get; set; }
 
         [JsonProperty("trackers")]
         public HashSet<(string amsInstanceId, string trackerId)> Trackers { get; set; } = new HashSet<(string amsInstanceId, string trackerId)>();
@@ -72,20 +72,20 @@ namespace AmsHighAvailability.Entities
             InputMediaFileUrl = inputMediaFileUrl;
             _log.LogInformation("Started job coordinator. JobCoordinatorEntityId={JobCoordinatorEntityId}, InputMediaFileUrl={InputMediaFileUrl}",
                 JobCoordinatorEntityId, InputMediaFileUrl);
-            Status = JobStatus.Received;
+            Status = AmsStatus.Submitted;
 
             // Start a new tracker.
             var trackerStarted = StartTracker();
             if (!trackerStarted)
             {
-                UpdateStatus(JobStatus.Failed);
+                UpdateStatus(AmsStatus.Failed);
                 return;
             }
 
-            Status = JobStatus.Processing;
+            Status = AmsStatus.Processing;
         }
 
-        private void UpdateStatus(JobStatus newJobStatus)
+        private void UpdateStatus(AmsStatus newJobStatus)
         {
             Status = newJobStatus;
             _log.LogInformation("Job coordinator has completed. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobStatus={JobStatus}",
@@ -96,7 +96,7 @@ namespace AmsHighAvailability.Entities
         {
             _log.LogInformation("Job tracker has succeeded; marking job coordinator as succeeded. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={jobTrackerEntityId}",
                 JobCoordinatorEntityId, arguments.jobTrackerEntityId);
-            UpdateStatus(JobStatus.Succeeded);
+            UpdateStatus(AmsStatus.Succeeded);
 
             // Keep a note of the tracker that succeeded with the job, so that the user can find the associated outputs.
             CompletedJob = new CompletedJob
@@ -117,7 +117,7 @@ namespace AmsHighAvailability.Entities
             {
                 _log.LogInformation("Unable to start a new tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}",
                     JobCoordinatorEntityId);
-                UpdateStatus(JobStatus.Failed);
+                UpdateStatus(AmsStatus.Failed);
             }
         }
 
@@ -135,7 +135,7 @@ namespace AmsHighAvailability.Entities
             var trackerId = $"{JobCoordinatorEntityId}|{Guid.NewGuid()}";
             var trackerEntityId = new EntityId(nameof(JobTrackerEntity), trackerId);
             Trackers.Add((amsInstanceId, trackerId));
-            Entity.Current.SignalEntity<IJobTracker>(trackerEntityId, proxy => proxy.Start((InputMediaFileUrl, amsInstanceId)));
+            Entity.Current.SignalEntity<IJobTrackerEntity>(trackerEntityId, proxy => proxy.Start((InputMediaFileUrl, amsInstanceId)));
             _log.LogInformation("Requested tracked job to start. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, AmsInstanceId={AmsInstanceId}",
                 JobCoordinatorEntityId, trackerId, amsInstanceId);
             return true;

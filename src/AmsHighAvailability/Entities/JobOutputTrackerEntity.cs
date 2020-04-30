@@ -11,7 +11,7 @@ namespace AmsHighAvailability.Entities
 {
     public interface IJobOutputTrackerEntity
     {
-        void StatusUpdate((AmsStatus newStatus, int progress, DateTimeOffset statusTime) arguments);
+        void ReceiveStatusUpdate((AmsStatus newStatus, int progress, DateTimeOffset statusTime) arguments); // TODO rename
     }
 
     public class JobOutputTrackerEntity : IJobOutputTrackerEntity
@@ -48,7 +48,7 @@ namespace AmsHighAvailability.Entities
         public static Task Run([EntityTrigger] IDurableEntityContext ctx, ILogger log)
             => ctx.DispatchAsync<JobOutputTrackerEntity>(log);
 
-        public void StatusUpdate((AmsStatus newStatus, int progress, DateTimeOffset statusTime) arguments)
+        public void ReceiveStatusUpdate((AmsStatus newStatus, int progress, DateTimeOffset statusTime) arguments)
         {
             _log.LogInformation("Received status update for job output tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Time={StatusTime}, JobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
                 JobCoordinatorEntityId, JobTrackerEntityId, JobOutputTrackerEntityId, arguments.statusTime, arguments.newStatus, arguments.progress);
@@ -72,7 +72,7 @@ namespace AmsHighAvailability.Entities
                     _log.LogInformation("Updating job tracker status from output tracker's status change. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Time={StatusTime}, JobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
                         JobCoordinatorEntityId, JobTrackerEntityId, JobOutputTrackerEntityId, arguments.statusTime, arguments.newStatus, arguments.progress);
                     var entityId = new EntityId(nameof(JobTrackerEntity), JobTrackerEntityId);
-                    Entity.Current.SignalEntity<IJobTracker>(entityId, proxy => proxy.ReceivePushOutputStatusUpdate(arguments.statusTime));
+                    Entity.Current.SignalEntity<IJobTrackerEntity>(entityId, proxy => proxy.ReceiveOutputStatusUpdate(arguments.statusTime));
                 }
             }
         }

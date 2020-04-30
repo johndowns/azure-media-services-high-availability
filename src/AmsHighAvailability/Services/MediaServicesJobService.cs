@@ -21,7 +21,7 @@ namespace AmsHighAvailability.Services
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
             string assetName);
 
-        Task GetJobStatus(
+        Task<AmsJobCurrentState> GetJobStatus(
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
             string jobName);
     }
@@ -97,7 +97,7 @@ namespace AmsHighAvailability.Services
             return (asset.StorageAccountName, asset.Container);
         }
 
-        public async Task GetJobStatus(
+        public async Task<AmsJobCurrentState> GetJobStatus(
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
             string jobName)
         {
@@ -106,7 +106,17 @@ namespace AmsHighAvailability.Services
             var job = await client.Jobs.GetAsync(
                 resourceGroupName, mediaServicesInstanceName,
                 AdaptiveStreamingTransformName, jobName);
-            job.Outputs.Select(o => new { o.Progress, o.State, o.Label }); // TODO
+            var outputStates = job.Outputs.Select(o => new AmsJobOutputCurrentState
+            {
+                Label = o.Label,
+                State = o.State.ToAmsStatus(),
+                Progress = o.Progress
+            });
+            return new AmsJobCurrentState
+            {
+                State = job.State.ToAmsStatus(),
+                OutputStates = outputStates
+            };            
         }
 
         private async Task<AzureMediaServicesClient> GetAzureMediaServicesClient(string subscriptionId)
@@ -180,5 +190,21 @@ namespace AmsHighAvailability.Services
                 });
             return job;
         }
+    }
+
+    public class AmsJobCurrentState
+    {
+        public AmsStatus State { get; set; }
+
+        public IEnumerable<AmsJobOutputCurrentState> OutputStates { get; set; }
+    }
+
+    public class AmsJobOutputCurrentState
+    {
+        public string Label { get; set; }
+
+        public AmsStatus State { get; set; }
+
+        public int Progress { get; set; }
     }
 }

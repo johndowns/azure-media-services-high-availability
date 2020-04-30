@@ -1,7 +1,6 @@
 ﻿using AmsHighAvailability.Configuration;
 using AmsHighAvailability.Models;
 using AmsHighAvailability.Services;
-using Microsoft.Azure.Management.Media.Models;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Extensions.Logging;
@@ -14,13 +13,13 @@ using System.Threading.Tasks;
 
 namespace AmsHighAvailability.Entities
 {
-    public interface IJobTracker
+    public interface IJobTrackerEntity
     {
         Task Start((string inputMediaFileUrl, string amsInstanceId) arguments);
 
-        Task ReceivePushStatusUpdate((AmsStatus newStatus, DateTimeOffset statusTime) arguments);
+        Task ReceiveStatusUpdate((AmsStatus newStatus, DateTimeOffset statusTime) arguments);
 
-        void ReceivePushOutputStatusUpdate(DateTimeOffset statusTime);
+        void ReceiveOutputStatusUpdate(DateTimeOffset statusTime);
 
         Task CheckIfJobStateIsCurrent();
 
@@ -28,7 +27,7 @@ namespace AmsHighAvailability.Entities
     }
 
     [JsonObject(MemberSerialization.OptIn)]
-    public class JobTrackerEntity : IJobTracker
+    public class JobTrackerEntity : IJobTrackerEntity
     {
         [JsonProperty("jobCoordinatorEntityId")]
         public string JobCoordinatorEntityId => JobTrackerEntityId.Split('|')[0];
@@ -145,7 +144,7 @@ namespace AmsHighAvailability.Entities
             }
         }
 
-        public void ReceivePushOutputStatusUpdate(DateTimeOffset statusTime)
+        public void ReceiveOutputStatusUpdate(DateTimeOffset statusTime)
         {
             _log.LogInformation("Received status update for job tracker from output. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, Time={StatusTime}",
                 JobCoordinatorEntityId, JobTrackerEntityId, statusTime);
@@ -158,7 +157,7 @@ namespace AmsHighAvailability.Entities
             }
         }
 
-        public async Task ReceivePushStatusUpdate((AmsStatus newStatus, DateTimeOffset statusTime) arguments)
+        public async Task ReceiveStatusUpdate((AmsStatus newStatus, DateTimeOffset statusTime) arguments)
         {
             _log.LogInformation("Received status update for job tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, Time={StatusTime}, JobTrackerStatus={JobTrackerStatus}",
                 JobCoordinatorEntityId, JobTrackerEntityId, arguments.statusTime, arguments.newStatus);
@@ -192,7 +191,7 @@ namespace AmsHighAvailability.Entities
             }
 
             var statusTimeoutTimeUtc = DateTime.UtcNow.Add(_settings.JobTrackerCurrencyCheckInterval);
-            Entity.Current.SignalEntity<IJobTracker>(Entity.Current.EntityId, statusTimeoutTimeUtc, proxy => proxy.CheckIfJobStateIsCurrent());
+            Entity.Current.SignalEntity<IJobTrackerEntity>(Entity.Current.EntityId, statusTimeoutTimeUtc, proxy => proxy.CheckIfJobStateIsCurrent());
 
             _log.LogInformation("Scheduled tracker to check if the job state is current. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CheckTime={CheckTime}",
                 JobCoordinatorEntityId, JobTrackerEntityId, statusTimeoutTimeUtc);
@@ -214,10 +213,19 @@ namespace AmsHighAvailability.Entities
             if (LastTimeSeenStatusUpdate < DateTime.UtcNow.Subtract(_settings.JobTrackerCurrencyThreshold))
             {
                 // We haven't seen any updates from this job recently, so we need to trigger a manual poll of the job status.
-                //var jobStatus = await _mediaServicesJobService.GetJobStatus(
-                //    AmsInstanceConfiguration.MediaServicesSubscriptionId, AmsInstanceConfiguration.MediaServicesResourceGroupName, AmsInstanceConfiguration.MediaServicesInstanceName,
-                //    JobTrackerEntityId);
-                // TODO
+                var retrievedTime = DateTimeOffset.UtcNow;
+                var jobCurrentState = await _mediaServicesJobService.GetJobStatus(
+                    AmsInstanceConfiguration.MediaServicesSubscriptionId, AmsInstanceConfiguration.MediaServicesResourceGroupName, AmsInstanceConfiguration.MediaServicesInstanceName,
+                    JobTrackerEntityId);
+
+                // We then send the updates back to the relevant entities through the standard status notification process.
+                Entity.Current.SignalEntity<IJobTrackerEntity>(Entity.Current.EntityId, proxy => proxy.ReceiveStatusUpdate((jobCurrentState.State, retrievedTime)));
+
+                // TODO check labels are the entity ID
+                foreach (var outputState in jobCurrentState.OutputStates)
+                {
+                    Entity.Current.SignalEntity<IJobOutputTrackerEntity>(new EntityId(nameof(JobTrackerEntity), outputState.Label), proxy => proxy.ReceiveStatusUpdate((outputState.State, outputState.Progress, retrievedTime)));
+                }
             }
         }
 
@@ -231,7 +239,7 @@ namespace AmsHighAvailability.Entities
             }
 
             var statusTimeoutTimeUtc = DateTime.UtcNow.Add(_settings.JobTrackerTimeoutCheckInterval);
-            Entity.Current.SignalEntity<IJobTracker>(Entity.Current.EntityId, statusTimeoutTimeUtc, proxy => proxy.CheckIfJobHasTimedOut());
+            Entity.Current.SignalEntity<IJobTrackerEntity>(Entity.Current.EntityId, statusTimeoutTimeUtc, proxy => proxy.CheckIfJobHasTimedOut());
 
             _log.LogInformation("Scheduled tracker to check if the job has timed out. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CheckTime={CheckTime}",
                 JobCoordinatorEntityId, JobTrackerEntityId, statusTimeoutTimeUtc);
