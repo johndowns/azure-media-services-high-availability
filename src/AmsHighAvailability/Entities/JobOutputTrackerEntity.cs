@@ -11,7 +11,7 @@ namespace AmsHighAvailability.Entities
 {
     public interface IJobOutputTrackerEntity
     {
-        void ReceiveStatusUpdate((ExtendedJobState newStatus, int progress, DateTimeOffset statusTime) arguments); // TODO rename
+        void ReceiveStatusUpdate((ExtendedJobState newStatus, int progress, DateTimeOffset statusTime) arguments);
     }
 
     public class JobOutputTrackerEntity : IJobOutputTrackerEntity

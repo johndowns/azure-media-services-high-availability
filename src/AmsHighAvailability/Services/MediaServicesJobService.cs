@@ -53,7 +53,7 @@ namespace AmsHighAvailability.Services
             string inputMediaUrl,
             string jobName)
         {
-            var client = await GetAzureMediaServicesClient(subscriptionId); // TODO should this be reused?
+            var client = await GetAzureMediaServicesClient(subscriptionId);
 
             // Ensure the transform profile exists.
             await GetOrCreateTransformAsync(client, resourceGroupName, mediaServicesInstanceName, AdaptiveStreamingTransformName);
@@ -89,7 +89,7 @@ namespace AmsHighAvailability.Services
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
             string assetName)
         {
-            var client = await GetAzureMediaServicesClient(subscriptionId); // TODO should this be reused?
+            var client = await GetAzureMediaServicesClient(subscriptionId);
 
             var asset = await client.Assets.GetAsync(
                 resourceGroupName, mediaServicesInstanceName,
@@ -101,7 +101,7 @@ namespace AmsHighAvailability.Services
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
             string jobName)
         {
-            var client = await GetAzureMediaServicesClient(subscriptionId); // TODO should this be reused?
+            var client = await GetAzureMediaServicesClient(subscriptionId);
 
             var job = await client.Jobs.GetAsync(
                 resourceGroupName, mediaServicesInstanceName,
