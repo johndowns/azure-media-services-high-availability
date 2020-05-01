@@ -10,7 +10,6 @@ using AmsHighAvailability.Entities;
 using System.Web.Http;
 using System.Collections.Generic;
 using AmsHighAvailability.Models;
-using System.Diagnostics;
 
 namespace AmsHighAvailability
 {
@@ -23,8 +22,6 @@ namespace AmsHighAvailability
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
         {
-            Activity.Current.AddTag("TODOMyCustomTag", "MyCustomTagValue123");
-
             if (string.IsNullOrEmpty(jobRequest.MediaFileUrl))
             {
                 return new BadRequestErrorMessageResult("Please provide a MediaFileUrl property in the request body.");
