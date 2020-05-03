@@ -196,10 +196,10 @@ namespace AmsHighAvailability.Entities
             }
 
             var statusTimeoutTimeUtc = DateTime.UtcNow.Add(_settings.JobTrackerCurrencyCheckInterval);
-            Entity.Current.SignalEntity<IJobTrackerEntity>(
+            Entity.Current.SignalEntity(
                 Entity.Current.EntityId,
                 statusTimeoutTimeUtc,
-                proxy => proxy.CheckIfJobStateIsCurrent()); // TODO
+                nameof(CheckIfJobStateIsCurrent)); // HACK: this is not using the SignalEntity<T> overload due to this bug: https://github.com/Azure/azure-functions-durable-extension/issues/1282
 
             _log.LogInformation("Scheduled tracker to check if the job state is current. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CheckTime={CheckTime}",
                 JobCoordinatorEntityId, JobTrackerEntityId, statusTimeoutTimeUtc);
@@ -256,10 +256,10 @@ namespace AmsHighAvailability.Entities
             }
 
             var statusTimeoutTimeUtc = DateTime.UtcNow.Add(_settings.JobTrackerTimeoutCheckInterval);
-            Entity.Current.SignalEntity<IJobTrackerEntity>(
+            Entity.Current.SignalEntity(
                 Entity.Current.EntityId,
                 statusTimeoutTimeUtc,
-                proxy => proxy.CheckIfJobHasTimedOut()); // TODO
+                nameof(CheckIfJobHasTimedOut)); // HACK: this is not using the SignalEntity<T> overload due to this bug: https://github.com/Azure/azure-functions-durable-extension/issues/1282
 
             _log.LogInformation("Scheduled tracker to check if the job has timed out. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CheckTime={CheckTime}",
                 JobCoordinatorEntityId, JobTrackerEntityId, statusTimeoutTimeUtc);
