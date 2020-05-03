@@ -99,7 +99,7 @@ namespace AmsHighAvailability.Entities
                 JobTrackerEntityId);
             if (! isSubmittedSuccessfully)
             {
-                _log.LogInformation("Failed to start job in Azure Media Services. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, AmsInstanceId={AmsInstanceId}",
+                _log.LogError("Failed to start job in Azure Media Services. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, AmsInstanceId={AmsInstanceId}",
                     JobCoordinatorEntityId, JobTrackerEntityId, AmsInstanceId);
                 await UpdateCurrentStatus(ExtendedJobState.Failed);
                 return;
@@ -130,7 +130,7 @@ namespace AmsHighAvailability.Entities
             }
 
             // Signal the coordinator that we have an update.
-            _log.LogInformation("Job tracker is updating job coordinator. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobCoordinatorEntityId={JobCoordinatorEntityId}, Status={Status}",
+            _log.LogDebug("Job tracker is updating job coordinator. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobCoordinatorEntityId={JobCoordinatorEntityId}, Status={Status}",
                 JobCoordinatorEntityId, JobTrackerEntityId, JobCoordinatorEntityId, CurrentStatus);
             
             if (CurrentStatus == ExtendedJobState.Succeeded)
@@ -151,7 +151,7 @@ namespace AmsHighAvailability.Entities
 
         public void ReceiveOutputStatusUpdate(DateTimeOffset statusTime)
         {
-            _log.LogInformation("Received status update for job tracker from output. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, Time={StatusTime}",
+            _log.LogInformation("Received update for job tracker from job output. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, Time={StatusTime}",
                 JobCoordinatorEntityId, JobTrackerEntityId, statusTime);
             StatusHistory.Add(new JobTrackerStatusHistory { StatusTime = statusTime, TimeReceived = DateTimeOffset.Now });
 
@@ -164,7 +164,7 @@ namespace AmsHighAvailability.Entities
 
         public async Task ReceiveStatusUpdate((ExtendedJobState newStatus, DateTimeOffset statusTime) arguments)
         {
-            _log.LogInformation("Received status update for job tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, Time={StatusTime}, JobTrackerStatus={JobTrackerStatus}",
+            _log.LogInformation("Received update for job tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, Time={StatusTime}, JobTrackerStatus={JobTrackerStatus}",
                 JobCoordinatorEntityId, JobTrackerEntityId, arguments.statusTime, arguments.newStatus);
             StatusHistory.Add(new JobTrackerStatusHistory { Status = arguments.newStatus, StatusTime = arguments.statusTime, TimeReceived = DateTimeOffset.Now });
 
@@ -190,8 +190,6 @@ namespace AmsHighAvailability.Entities
         {
             if (CurrentStatus == ExtendedJobState.Succeeded || CurrentStatus == ExtendedJobState.Failed || CurrentStatus == ExtendedJobState.TimedOut)
             {
-                _log.LogInformation("Skipped scheduling a new status check since tracker is in a final state. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CurrentStatus={CurrentStatus}",
-                    JobCoordinatorEntityId, JobTrackerEntityId, CurrentStatus);
                 return;
             }
 
@@ -201,19 +199,19 @@ namespace AmsHighAvailability.Entities
                 statusTimeoutTimeUtc,
                 nameof(CheckIfJobStateIsCurrent)); // HACK: this is not using the SignalEntity<T> overload due to this bug: https://github.com/Azure/azure-functions-durable-extension/issues/1282
 
-            _log.LogInformation("Scheduled tracker to check if the job state is current. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CheckTime={CheckTime}",
+            _log.LogDebug("Scheduled tracker to check if the job state is current. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CheckTime={CheckTime}",
                 JobCoordinatorEntityId, JobTrackerEntityId, statusTimeoutTimeUtc);
         }
 
         public async Task CheckIfJobStateIsCurrent()
         {
-            _log.LogInformation("Checking whether job tracker has a current job state. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, LastTimeSeenStatusUpdate={LastTimeSeenStatusUpdate}",
+            _log.LogDebug("Checking whether job tracker has a current job state. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, LastTimeSeenStatusUpdate={LastTimeSeenStatusUpdate}",
                 JobCoordinatorEntityId, JobTrackerEntityId, LastTimeSeenStatusUpdate);
 
             if (CurrentStatus == ExtendedJobState.Succeeded || CurrentStatus == ExtendedJobState.Failed || CurrentStatus == ExtendedJobState.TimedOut)
             {
                 // We don't expect state updates if the job isn't actively processing.
-                _log.LogInformation("Tracker is no longer in 'processing' state, so no further state updates are needed. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, LastTimeSeenJobProgress={LastTimeSeenJobProgress}",
+                _log.LogDebug("Tracker is no longer in 'processing' state, so no further state updates are needed. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, LastTimeSeenJobProgress={LastTimeSeenJobProgress}",
                     JobCoordinatorEntityId, JobTrackerEntityId, LastTimeSeenJobProgress);
                 return;
             }
@@ -221,8 +219,8 @@ namespace AmsHighAvailability.Entities
             if (LastTimeSeenStatusUpdate < DateTime.UtcNow.Subtract(_settings.JobTrackerCurrencyThreshold))
             {
                 // We haven't seen any updates from this job recently, so we need to trigger a manual poll of the job status.
-                _log.LogInformation("Pulling job state. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, LastTimeSeenJobProgress={LastTimeSeenJobProgress}",
-                    JobCoordinatorEntityId, JobTrackerEntityId, LastTimeSeenJobProgress);
+                _log.LogInformation("Job tracker state is not current. Pulling job state. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}",
+                    JobCoordinatorEntityId, JobTrackerEntityId);
 
                 var retrievedTime = DateTimeOffset.UtcNow;
                 var jobCurrentState = await _mediaServicesJobService.GetJobStatus(
@@ -236,11 +234,15 @@ namespace AmsHighAvailability.Entities
 
                 foreach (var outputState in jobCurrentState.OutputStates)
                 {
-                    _log.LogInformation($"TODO signalling entity {outputState.Label}"); // TODO check labels are the entity ID (they should be)
                     Entity.Current.SignalEntity<IJobOutputTrackerEntity>(
                         new EntityId(nameof(JobOutputTrackerEntity), outputState.Label),
                         proxy => proxy.ReceiveStatusUpdate((outputState.State, outputState.Progress, retrievedTime)));
                 }
+            }
+            else
+            {
+                _log.LogDebug($"Job is still considered to be current and will not be considered to be overdue for status updates until {LastTimeSeenStatusUpdate.Value.Add(_settings.JobTrackerCurrencyThreshold)}. JobCoordinatorEntityId={{JobCoordinatorEntityId}}, JobTrackerEntityId={{JobTrackerEntityId}}",
+                    JobCoordinatorEntityId, JobTrackerEntityId);
             }
 
             ScheduleNextJobStateCurrencyCheck();
@@ -250,7 +252,7 @@ namespace AmsHighAvailability.Entities
         {
             if (CurrentStatus == ExtendedJobState.Succeeded || CurrentStatus == ExtendedJobState.Failed || CurrentStatus == ExtendedJobState.TimedOut)
             {
-                _log.LogInformation("Skipped scheduling a new timeout check since tracker is in a final state. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CurrentStatus={CurrentStatus}",
+                _log.LogDebug("Skipped scheduling a new timeout check since tracker is in a final state. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CurrentStatus={CurrentStatus}",
                     JobCoordinatorEntityId, JobTrackerEntityId, CurrentStatus);
                 return;
             }
@@ -261,20 +263,20 @@ namespace AmsHighAvailability.Entities
                 statusTimeoutTimeUtc,
                 nameof(CheckIfJobHasTimedOut)); // HACK: this is not using the SignalEntity<T> overload due to this bug: https://github.com/Azure/azure-functions-durable-extension/issues/1282
 
-            _log.LogInformation("Scheduled tracker to check if the job has timed out. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CheckTime={CheckTime}",
+            _log.LogDebug("Scheduled tracker to check if the job has timed out. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CheckTime={CheckTime}",
                 JobCoordinatorEntityId, JobTrackerEntityId, statusTimeoutTimeUtc);
         }
 
         public async Task CheckIfJobHasTimedOut()
         {
-            _log.LogInformation("Checking whether job has timed out. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, LastTimeSeenJobProgress={LastTimeSeenJobProgress}",
+            _log.LogDebug("Checking whether job has timed out. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, LastTimeSeenJobProgress={LastTimeSeenJobProgress}",
                   JobCoordinatorEntityId, JobTrackerEntityId, LastTimeSeenJobProgress);
 
             if (CurrentStatus == ExtendedJobState.Succeeded || CurrentStatus == ExtendedJobState.Failed || CurrentStatus == ExtendedJobState.TimedOut)
             {
                 // We don't expect state updates if the job isn't actively processing.
-                _log.LogInformation("Tracker is no longer in 'processing' state, so no further state updates are needed. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, LastTimeSeenJobProgress={LastTimeSeenJobProgress}",
-                    JobCoordinatorEntityId, JobTrackerEntityId, LastTimeSeenJobProgress);
+                _log.LogDebug("Tracker is no longer in 'processing' state, so no further state updates are needed. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}",
+                    JobCoordinatorEntityId, JobTrackerEntityId);
                 return;
             }
 
@@ -282,10 +284,15 @@ namespace AmsHighAvailability.Entities
             {
                 // It has been too long since we have seen any progress being made on the job.
                 // This means we consider the job to have timed out.
-                _log.LogInformation("Job has not seen progress within the timeout threshold. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}",
+                _log.LogInformation("Job has not seen progress within the timeout threshold. Considering job to have timed out. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}",
                   JobCoordinatorEntityId, JobTrackerEntityId, LastTimeSeenJobProgress);
 
                 await UpdateCurrentStatus(ExtendedJobState.TimedOut);
+            }
+            else
+            {
+                _log.LogDebug($"Job has seen progress within the timeout threshold and will not be considered to be timed out until {LastTimeSeenStatusUpdate.Value.Add(_settings.JobTrackerTimeoutThreshold)}. JobCoordinatorEntityId={{JobCoordinatorEntityId}}, JobTrackerEntityId={{JobTrackerEntityId}}",
+                    JobCoordinatorEntityId, JobTrackerEntityId);
             }
 
             ScheduleNextJobTimeoutCheck();

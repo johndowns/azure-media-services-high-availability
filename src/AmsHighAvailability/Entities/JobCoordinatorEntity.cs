@@ -108,14 +108,14 @@ namespace AmsHighAvailability.Entities
 
         public void MarkTrackerAsFailed((string jobTrackerEntityId, ExtendedJobState jobStatus) arguments)
         {
-            _log.LogInformation("Job tracker has entered terminal status. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={jobTrackerEntityId}, JobStatus={jobStatus}",
+            _log.LogInformation("Job tracker has failed. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={jobTrackerEntityId}, JobStatus={jobStatus}",
                 JobCoordinatorEntityId, arguments.jobTrackerEntityId, arguments.jobStatus);
 
             // Try to restart the job, and if it doesn't work, we consider the whole job to have failed.
             var newTrackerStarted = StartTracker();
             if (!newTrackerStarted)
             {
-                _log.LogInformation("Unable to start a new tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}",
+                _log.LogError("Unable to start a new tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}",
                     JobCoordinatorEntityId);
                 UpdateStatus(ExtendedJobState.Failed);
             }
@@ -138,7 +138,7 @@ namespace AmsHighAvailability.Entities
             Entity.Current.SignalEntity<IJobTrackerEntity>(
                 trackerEntityId,
                 proxy => proxy.Start((InputMediaFileUrl, amsInstanceId)));
-            _log.LogInformation("Requested tracked job to start. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, AmsInstanceId={AmsInstanceId}",
+            _log.LogDebug("Requested tracked job to start. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, AmsInstanceId={AmsInstanceId}",
                 JobCoordinatorEntityId, trackerId, amsInstanceId);
             return true;
         }

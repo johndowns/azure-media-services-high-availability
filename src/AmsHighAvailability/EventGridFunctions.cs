@@ -24,7 +24,7 @@ namespace AmsHighAvailability
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
         {
-            log.LogInformation("Received job status Event Grid event of type {EventGridEventType} for subject {EventGridEventSubject}.",
+            log.LogDebug("Received job status Event Grid event of type {EventGridEventType} for subject {EventGridEventSubject}.",
                 eventGridEvent.EventType, eventGridEvent.Subject);
             if (eventGridEvent.EventType != "Microsoft.Media.JobStateChange") return;
 
@@ -38,7 +38,7 @@ namespace AmsHighAvailability
             // We aren't interested until the job actually starts getting processed.
             if (jobTrackerStatus == ExtendedJobState.Submitted) return;
 
-            log.LogInformation("Updating job tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobTrackerStatus={JobTrackerStatus}, StatusTime={StatusTime}",
+            log.LogDebug("Updating job tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobTrackerStatus={JobTrackerStatus}, StatusTime={StatusTime}",
                 jobTrackerEntityId, jobTrackerStatus, statusTime);
             var entityId = new EntityId(nameof(JobTrackerEntity), jobTrackerEntityId);
             await durableEntityClient.SignalEntityAsync<IJobTrackerEntity>(entityId, proxy => proxy.ReceiveStatusUpdate((jobTrackerStatus, statusTime)));
@@ -50,7 +50,7 @@ namespace AmsHighAvailability
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
         {
-            log.LogInformation("Received job output status Event Grid event of type {EventGridEventType} for subject {EventGridEventSubject}.",
+            log.LogDebug("Received job output status Event Grid event of type {EventGridEventType} for subject {EventGridEventSubject}.",
                 eventGridEvent.EventType, eventGridEvent.Subject);
             if (eventGridEvent.EventType != "Microsoft.Media.JobOutputStateChange") return;
 
@@ -66,7 +66,7 @@ namespace AmsHighAvailability
             // We aren't interested until the job actually starts getting processed.
             if (jobOutputTrackerStatus == ExtendedJobState.Submitted) return;
 
-            log.LogInformation("Updating job output tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, jobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}, StatusTime={StatusTime}",
+            log.LogDebug("Updating job output tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, jobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}, StatusTime={StatusTime}",
                 jobOutputTrackerEntityId, jobTrackerEntityId, jobOutputTrackerStatus, jobOutputTrackerProgress, statusTime);
             var entityId = new EntityId(nameof(JobOutputTrackerEntity), jobOutputTrackerEntityId);
             await durableEntityClient.SignalEntityAsync<IJobOutputTrackerEntity>(entityId, proxy => proxy.ReceiveStatusUpdate((jobOutputTrackerStatus, jobOutputTrackerProgress, statusTime)));

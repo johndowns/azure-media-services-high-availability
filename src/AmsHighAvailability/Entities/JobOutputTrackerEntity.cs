@@ -31,7 +31,7 @@ namespace AmsHighAvailability.Entities
         [JsonProperty("currentProgress")]
         public int CurrentProgress { get; set; } = 0;
 
-        public HashSet<JobOutputTrackerStatusHistory> StatusHistory { get; set; } = new HashSet<JobOutputTrackerStatusHistory>();
+        public HashSet<JobOutputTrackerStatusHistory> StatusHistory { get; set; } = new HashSet<JobOutputTrackerStatusHistory>(); // TODO rename Status -> State
 
         [JsonProperty("LastTimeSeenJobOutputProgress")]
         public DateTimeOffset? LastTimeSeenJobOutputProgress { get; set; } = null;
@@ -50,7 +50,7 @@ namespace AmsHighAvailability.Entities
 
         public void ReceiveStatusUpdate((ExtendedJobState newStatus, int progress, DateTimeOffset statusTime) arguments)
         {
-            _log.LogInformation("Received status update for job output tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Time={StatusTime}, JobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
+            _log.LogInformation("Received state update for job output tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Time={StatusTime}, JobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
                 JobCoordinatorEntityId, JobTrackerEntityId, JobOutputTrackerEntityId, arguments.statusTime, arguments.newStatus, arguments.progress);
             StatusHistory.Add(new JobOutputTrackerStatusHistory { StatusTime = arguments.statusTime, Progress = arguments.progress, TimeReceived = DateTimeOffset.Now });
 
@@ -69,7 +69,7 @@ namespace AmsHighAvailability.Entities
                     LastTimeSeenJobOutputProgress = arguments.statusTime;
 
                     // Signal the tracker that we have seen a progress update.
-                    _log.LogInformation("Updating job tracker status from output tracker's status change. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Time={StatusTime}, JobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
+                    _log.LogDebug("Updating job tracker status from output tracker's status change. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Time={StatusTime}, JobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
                         JobCoordinatorEntityId, JobTrackerEntityId, JobOutputTrackerEntityId, arguments.statusTime, arguments.newStatus, arguments.progress);
                     var entityId = new EntityId(nameof(JobTrackerEntity), JobTrackerEntityId);
                     Entity.Current.SignalEntity<IJobTrackerEntity>(

@@ -32,7 +32,7 @@ namespace AmsHighAvailability
             var entityId = new EntityId(nameof(JobCoordinatorEntity), jobCoordinatorId);
             await durableEntityClient.SignalEntityAsync<IJobCoordinatorEntity>(entityId, proxy => proxy.Start(jobRequest.MediaFileUrl));
 
-            log.LogInformation("Initiated job coordinator. JobCoordinatorEntityId={JobCoordinatorEntityId}", jobCoordinatorId);
+            log.LogDebug("Initiated job coordinator. JobCoordinatorEntityId={JobCoordinatorEntityId}", jobCoordinatorId);
 
             var checkStatusLocation = $"{req.Scheme}://{req.Host}/api/jobCoordinators/{jobCoordinatorId}";
             return new AcceptedResult(checkStatusLocation, null);
