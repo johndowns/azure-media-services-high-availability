@@ -135,7 +135,9 @@ namespace AmsHighAvailability.Entities
             var trackerId = $"{JobCoordinatorEntityId}|{Guid.NewGuid()}";
             var trackerEntityId = new EntityId(nameof(JobTrackerEntity), trackerId);
             Trackers.Add((amsInstanceId, trackerId));
-            Entity.Current.SignalEntity<IJobTrackerEntity>(trackerEntityId, proxy => proxy.Start((InputMediaFileUrl, amsInstanceId)));
+            Entity.Current.SignalEntity<IJobTrackerEntity>(
+                trackerEntityId,
+                proxy => proxy.Start((InputMediaFileUrl, amsInstanceId)));
             _log.LogInformation("Requested tracked job to start. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, AmsInstanceId={AmsInstanceId}",
                 JobCoordinatorEntityId, trackerId, amsInstanceId);
             return true;

@@ -137,11 +137,15 @@ namespace AmsHighAvailability.Entities
             {
                 // Get the latest details about the job's output assets so we can send them back in API responses.
                 await UpdateAssets();
-                Entity.Current.SignalEntity<IJobCoordinatorEntity>(new EntityId(nameof(JobCoordinatorEntity), JobCoordinatorEntityId), proxy => proxy.MarkTrackerAsSucceeded((JobTrackerEntityId, Assets)));
+                Entity.Current.SignalEntity<IJobCoordinatorEntity>(
+                    new EntityId(nameof(JobCoordinatorEntity), JobCoordinatorEntityId),
+                    proxy => proxy.MarkTrackerAsSucceeded((JobTrackerEntityId, Assets)));
             }
             else
             {
-                Entity.Current.SignalEntity<IJobCoordinatorEntity>(new EntityId(nameof(JobCoordinatorEntity), JobCoordinatorEntityId), proxy => proxy.MarkTrackerAsFailed((JobTrackerEntityId, CurrentStatus)));
+                Entity.Current.SignalEntity<IJobCoordinatorEntity>(
+                    new EntityId(nameof(JobCoordinatorEntity), JobCoordinatorEntityId),
+                    proxy => proxy.MarkTrackerAsFailed((JobTrackerEntityId, CurrentStatus)));
             }
         }
 
@@ -192,7 +196,10 @@ namespace AmsHighAvailability.Entities
             }
 
             var statusTimeoutTimeUtc = DateTime.UtcNow.Add(_settings.JobTrackerCurrencyCheckInterval);
-            Entity.Current.SignalEntity<IJobTrackerEntity>(Entity.Current.EntityId, statusTimeoutTimeUtc, proxy => proxy.CheckIfJobStateIsCurrent());
+            Entity.Current.SignalEntity<IJobTrackerEntity>(
+                Entity.Current.EntityId,
+                statusTimeoutTimeUtc,
+                proxy => proxy.CheckIfJobStateIsCurrent()); // TODO
 
             _log.LogInformation("Scheduled tracker to check if the job state is current. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CheckTime={CheckTime}",
                 JobCoordinatorEntityId, JobTrackerEntityId, statusTimeoutTimeUtc);
@@ -223,12 +230,16 @@ namespace AmsHighAvailability.Entities
                     JobTrackerEntityId);
 
                 // We then send the updates back to the relevant entities through the standard status notification process.
-                Entity.Current.SignalEntity<IJobTrackerEntity>(Entity.Current.EntityId, proxy => proxy.ReceiveStatusUpdate((jobCurrentState.State, retrievedTime)));
+                Entity.Current.SignalEntity<IJobTrackerEntity>(
+                    Entity.Current.EntityId,
+                    proxy => proxy.ReceiveStatusUpdate((jobCurrentState.State, retrievedTime)));
 
                 foreach (var outputState in jobCurrentState.OutputStates)
                 {
                     _log.LogInformation($"TODO signalling entity {outputState.Label}"); // TODO check labels are the entity ID (they should be)
-                    Entity.Current.SignalEntity<IJobOutputTrackerEntity>(new EntityId(nameof(JobOutputTrackerEntity), outputState.Label), proxy => proxy.ReceiveStatusUpdate((outputState.State, outputState.Progress, retrievedTime)));
+                    Entity.Current.SignalEntity<IJobOutputTrackerEntity>(
+                        new EntityId(nameof(JobOutputTrackerEntity), outputState.Label),
+                        proxy => proxy.ReceiveStatusUpdate((outputState.State, outputState.Progress, retrievedTime)));
                 }
             }
 
@@ -245,7 +256,10 @@ namespace AmsHighAvailability.Entities
             }
 
             var statusTimeoutTimeUtc = DateTime.UtcNow.Add(_settings.JobTrackerTimeoutCheckInterval);
-            Entity.Current.SignalEntity<IJobTrackerEntity>(Entity.Current.EntityId, statusTimeoutTimeUtc, proxy => proxy.CheckIfJobHasTimedOut());
+            Entity.Current.SignalEntity<IJobTrackerEntity>(
+                Entity.Current.EntityId,
+                statusTimeoutTimeUtc,
+                proxy => proxy.CheckIfJobHasTimedOut()); // TODO
 
             _log.LogInformation("Scheduled tracker to check if the job has timed out. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, CheckTime={CheckTime}",
                 JobCoordinatorEntityId, JobTrackerEntityId, statusTimeoutTimeUtc);
