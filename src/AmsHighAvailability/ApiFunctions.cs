@@ -15,9 +15,9 @@ namespace AmsHighAvailability
 {
     public class ApiFunctions
     {
-        [FunctionName("CreateJob")]
-        public async Task<IActionResult> CreateJob(
-            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "jobs")] CreateJobRequest jobRequest,
+        [FunctionName("CreateJobCoordinator")]
+        public async Task<IActionResult> CreateJobCoordinator(
+            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "jobCoordinators")] CreateJobCoordinatorRequest jobRequest, // TODO potentially change from /jobs to /jobCoordinators?
             HttpRequest req,
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
@@ -28,25 +28,25 @@ namespace AmsHighAvailability
             }
 
             // Start the job by signalling the entity.
-            var jobId = Guid.NewGuid().ToString();
-            var entityId = new EntityId(nameof(JobCoordinatorEntity), jobId);
+            var jobCoordinatorId = Guid.NewGuid().ToString();
+            var entityId = new EntityId(nameof(JobCoordinatorEntity), jobCoordinatorId);
             await durableEntityClient.SignalEntityAsync<IJobCoordinatorEntity>(entityId, proxy => proxy.Start(jobRequest.MediaFileUrl));
 
-            log.LogInformation("Initiated job. JobCoordinatorEntityId={JobCoordinatorEntityId}", jobId);
+            log.LogInformation("Initiated job coordinator. JobCoordinatorEntityId={JobCoordinatorEntityId}", jobCoordinatorId);
 
-            var checkStatusLocation = $"{req.Scheme}://{req.Host}/api/jobs/{jobId}";
+            var checkStatusLocation = $"{req.Scheme}://{req.Host}/api/jobCoordinators/{jobCoordinatorId}";
             return new AcceptedResult(checkStatusLocation, null);
         }
 
-        [FunctionName("GetJob")]
-        public async Task<IActionResult> GetJob(
-            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "jobs/{jobId}")] CreateJobRequest jobRequest,
+        [FunctionName("GetJobCoordinator")]
+        public async Task<IActionResult> GetJobCoordinator(
+            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "jobCoordinators/{jobCoordinatorId}")] CreateJobCoordinatorRequest jobRequest,
             HttpRequest req,
-            string jobId,
+            string jobCoordinatorId,
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
         {
-            var entityId = new EntityId(nameof(JobCoordinatorEntity), jobId);
+            var entityId = new EntityId(nameof(JobCoordinatorEntity), jobCoordinatorId);
             var entityState = await durableEntityClient.ReadEntityStateAsync<JobCoordinatorEntity>(entityId);
             
             if (!entityState.EntityExists)
@@ -54,7 +54,7 @@ namespace AmsHighAvailability
                 return new NotFoundResult();
             }
 
-            var response = new JobStatusResponse
+            var response = new JobCoordinatorStateResponse
             {
                 JobState = entityState.EntityState.Status.ToString(),
                 MediaFileUrl = entityState.EntityState.InputMediaFileUrl
@@ -74,12 +74,12 @@ namespace AmsHighAvailability
     }
 
     #region API Request and Response Models
-    public class CreateJobRequest
+    public class CreateJobCoordinatorRequest
     {
         public string MediaFileUrl { get; set; }
     }
 
-    public class JobStatusResponse
+    public class JobCoordinatorStateResponse
     {
         public string JobState { get; set; }
 

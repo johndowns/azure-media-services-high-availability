@@ -62,7 +62,7 @@ However, the approach has a number of disadvantages and caveats:
 
 Please execute the `deploy/deploy.ps1` PowerShell script to deploy the sample code into your own Azure subscription.
 
-Once you have deployed the components, you can create a new job by using the job coordinator API. The deployment script outputs a customised URL for your environment. Using a tool like Postman, send a `POST` HTTP request to that URL with a JSON body like this:
+Once you have deployed the components, you can create a new job coordinator by using the job coordinator API. The deployment script outputs a customised URL for your environment. Using a tool like Postman, send a `POST` HTTP request to that URL with a JSON body like this:
 
 ```json
 {

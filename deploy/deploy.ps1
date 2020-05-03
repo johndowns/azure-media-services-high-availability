@@ -100,4 +100,4 @@ New-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFil
 
 # Output the URL to use to create a media encoding job.
 Write-Host 'Deployment successful.'
-Write-Host "To test this API, try submitting a POST request to https://$functionAppName.azurewebsites.net/api/jobs?code=$functionAppApiKey"
+Write-Host "To test this API, try submitting a POST request to https://$functionAppName.azurewebsites.net/api/jobCoordinators?code=$functionAppApiKey"

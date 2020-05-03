@@ -200,9 +200,8 @@ namespace AmsHighAvailability.Entities
 
         public async Task CheckIfJobStateIsCurrent()
         {
-            // TODO try using Activity.Current.Tags
-            _log.LogInformation("Checking whether job tracker has a current job state. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, LastTimeSeenJobProgress={LastTimeSeenJobProgress}",
-                JobCoordinatorEntityId, JobTrackerEntityId, LastTimeSeenJobProgress);
+            _log.LogInformation("Checking whether job tracker has a current job state. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, LastTimeSeenStatusUpdate={LastTimeSeenStatusUpdate}",
+                JobCoordinatorEntityId, JobTrackerEntityId, LastTimeSeenStatusUpdate);
 
             if (CurrentStatus == ExtendedJobState.Succeeded || CurrentStatus == ExtendedJobState.Failed || CurrentStatus == ExtendedJobState.TimedOut)
             {
@@ -232,6 +231,8 @@ namespace AmsHighAvailability.Entities
                     Entity.Current.SignalEntity<IJobOutputTrackerEntity>(new EntityId(nameof(JobOutputTrackerEntity), outputState.Label), proxy => proxy.ReceiveStatusUpdate((outputState.State, outputState.Progress, retrievedTime)));
                 }
             }
+
+            ScheduleNextJobStateCurrencyCheck();
         }
 
         private void ScheduleNextJobTimeoutCheck()
@@ -267,8 +268,13 @@ namespace AmsHighAvailability.Entities
             {
                 // It has been too long since we have seen any progress being made on the job.
                 // This means we consider the job to have timed out.
+                _log.LogInformation("Job has not seen progress within the timeout threshold. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}",
+                  JobCoordinatorEntityId, JobTrackerEntityId, LastTimeSeenJobProgress);
+
                 await UpdateCurrentStatus(ExtendedJobState.TimedOut);
             }
+
+            ScheduleNextJobTimeoutCheck();
         }
 
         private async Task UpdateAssets()
