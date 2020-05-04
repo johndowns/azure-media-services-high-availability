@@ -27,6 +27,7 @@ $createdAmsInstances = $amsDeployment.Outputs['createdInstances'].Value
 # Deploy the function app resources.
 Write-Host 'Deploying Azure Functions app resources.'
 Write-Host 'Often this step fails the first time it executes because the managed identity does not provision successfully. If this happens, the script will retry the deployment.'
+$ErrorActionPreference = 'Continue' # Due to the issue provisioning new managed identities, we will temporarily allow errors to continue for this section of the script
 $hasDeployedFunctionApp = $false
 while ($hasDeployedFunctionApp -ne $true)
 {
@@ -38,6 +39,7 @@ while ($hasDeployedFunctionApp -ne $true)
     Write-Host 'Retrying Azure Functions app resources deployment in 5 seconds.'
     Start-Sleep -Seconds 5
 }
+$ErrorActionPreference = 'Stop'
 
 $functionAppName = $functionAppDeployment.Outputs['functionAppName'].Value
 $functionAppIdentityPrincipalId = $functionAppDeployment.Outputs['functionAppIdentityPrincipalId'].Value
