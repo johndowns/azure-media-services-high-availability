@@ -40,7 +40,7 @@ Once the job coordinator has selected an instance of Azure Media Services to sub
 
 If the job tracker does not receive any updates within a defined timeout period, or if the job fails due to a transient or regional issue, the job tracker will signal the job coordinator that its attempt has failed. The job coordinator then selects an alternative instance of Azure Media Services to make another attempt.
 
-The client can poll the status of the job thorugh the job coordinator, and once an attempt has been successful the job's output asset details can be provided back to the client. However, if all instances of Azure Media Services fail to process the job, or if an error is returned indicating that there is a problem with the media file itself, then the job coordinator considers the job to have permanently failed.
+The client can poll the state of the job thorugh the job coordinator, and once an attempt has been successful the job's output asset details can be provided back to the client. However, if all instances of Azure Media Services fail to process the job, or if an error is returned indicating that there is a problem with the media file itself, then the job coordinator considers the job to have permanently failed.
 
 ## Advantages and disadvantages
 
@@ -70,4 +70,4 @@ Once you have deployed the components, you can create a new job coordinator by u
 }
 ```
 
-This API returns a `202 Accepted` response code with a `Location` header that represents the job. You can issue an HTTP `GET` against this URL to retrieve the job's status. Note that, to enable security on this API, you need to include the `?code={your-unique-function-key}` query string parameter to access this API.
+This API returns a `202 Accepted` response code with a `Location` header that represents the job. You can issue an HTTP `GET` against this URL to retrieve the job's state. Note that, to enable security on this API, you need to include the `?code={your-unique-function-key}` query string parameter to access this API.

@@ -18,8 +18,8 @@ namespace AmsHighAvailability
     {
         private static readonly Regex EventSubjectRegex = new Regex(@".*\/jobs\/(.*)");
         
-        [FunctionName("AmsJobStatusUpdate")]
-        public async Task AmsJobStatusUpdate(
+        [FunctionName("AmsJobStateUpdate")]
+        public async Task AmsJobStateUpdate(
             [EventGridTrigger]EventGridEvent eventGridEvent,
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
@@ -44,8 +44,8 @@ namespace AmsHighAvailability
             await durableEntityClient.SignalEntityAsync<IJobTrackerEntity>(entityId, proxy => proxy.ReceiveStateUpdate((state, timestamp)));
         }
 
-        [FunctionName("AmsJobOutputStatusUpdate")]
-        public async Task AmsJobOutputStatusUpdate(
+        [FunctionName("AmsJobOutputStateUpdate")]
+        public async Task AmsJobOutputStateUpdate(
             [EventGridTrigger]EventGridEvent eventGridEvent,
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
