@@ -45,7 +45,7 @@
         {
             "name": "[variables('functionAppName')]",
             "type": "Microsoft.Web/sites",
-            "apiVersion": "2018-02-01",
+            "apiVersion": "2019-08-01",
             "location": "[parameters('location')]",
             "kind": "functionapp",
             "identity": {
@@ -88,7 +88,7 @@
             "resources": [
                 {
                     "type": "host/functionKeys",
-                    "apiVersion": "2018-11-01",
+                    "apiVersion": "2019-08-01",
                     "name": "default/api",
                     "dependsOn": [
                         "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
