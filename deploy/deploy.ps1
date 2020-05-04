@@ -1,7 +1,10 @@
+param(
+    $ResourceGroupName = 'AmsHighAvailability',
+    $ResourceGroupLocation = 'australiaeast'
+)
+
 $ErrorActionPreference = 'Stop'
 
-$resourceGroupName = 'TempAms3'
-$resourceGroupLocation = 'australiaeast'
 $amsInstances = @(
     @{ instanceId = "aus"; location = "australiaeast" },
     @{ instanceId = "eus"; location = "eastus2" }
@@ -13,11 +16,11 @@ $jobTrackerTimeoutThreshold = '01:00:00'
 $amsInstanceRoutingMethod = 'Random'
 
 Write-Host 'Creating resource group.'
-New-AzResourceGroup -Name $resourceGroupName -Location $resourceGroupLocation -Force
+New-AzResourceGroup -Name $ResourceGroupName -Location $ResourceGroupLocation -Force
 
 # Deploy the Azure Media Services instances.
 Write-Host 'Deploying Azure Media Services instances.'
-$amsDeployment = New-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile 'template-ams.json' `
+$amsDeployment = New-AzResourceGroupDeployment -ResourceGroupName $ResourceGroupName -TemplateFile 'template-ams.json' `
     -instances $amsInstances
 $createdAmsInstances = $amsDeployment.Outputs['createdInstances'].Value
 
@@ -27,7 +30,7 @@ Write-Host 'Often this step fails the first time it executes because the managed
 $hasDeployedFunctionApp = $false
 while ($hasDeployedFunctionApp -ne $true)
 {
-    $functionAppDeployment = New-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile 'template-functionapp.json'
+    $functionAppDeployment = New-AzResourceGroupDeployment -ResourceGroupName $ResourceGroupName -TemplateFile 'template-functionapp.json'
     if ($null -ne $functionAppDeployment.Outputs)
     {
         break
@@ -42,7 +45,7 @@ $functionAppApiKey = $functionAppDeployment.Outputs['functionAppApiKey'].Value
 
 # Deploy the function app settings with references to the Azure Media Services resources.
 Write-Host 'Constructing function app settings.'
-$functionAppDefinition = Get-AzWebApp -Name $functionAppName -ResourceGroupName $resourceGroupName
+$functionAppDefinition = Get-AzWebApp -Name $functionAppName -ResourceGroupName $ResourceGroupName
 $functionAppSettings = $functionAppDefinition.SiteConfig.AppSettings
 $functionAppSettingsHash = @{}
 foreach ($kvp in $functionAppSettings)
@@ -77,7 +80,7 @@ foreach ($createdAmsInstance in $createdAmsInstances)
     $functionAppSettingsHash["Options:AmsInstances:$($createdAmsInstanceId):MediaServicesInstanceName"] = $createdAmsInstanceResourceName
 }
 Write-Host 'Updating Azure Functions app settings.'
-Set-AzWebApp -Name $functionAppName -ResourceGroupName $resourceGroupName -AppSettings $functionAppSettingsHash
+Set-AzWebApp -Name $functionAppName -ResourceGroupName $ResourceGroupName -AppSettings $functionAppSettingsHash
 
 # Compile the app and deploy the binaries to the function app.
 Write-Host 'Building application.'
@@ -86,16 +89,16 @@ $functionZipFilePath = (New-TemporaryFile).FullName + '.zip'
 Compress-Archive -Path ../src/AmsHighAvailability/bin/Debug/netcoreapp3.1/publish/* -DestinationPath $functionZipFilePath -Force
 
 Write-Host 'Publishing application to Azure Functions app.'
-Publish-AzWebApp -ResourceGroupName $resourceGroupName -Name $functionAppName -ArchivePath $functionZipFilePath -Force
+Publish-AzWebApp -ResourceGroupName $ResourceGroupName -Name $functionAppName -ArchivePath $functionZipFilePath -Force
 
 # Deploy the Azure IAM role assignments, to allow the function app's managed identity to access the Azure Media Services instances.
 Write-Host 'Deploying Azure IAM role assignments.'
-New-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile 'template-iam.json' `
+New-AzResourceGroupDeployment -ResourceGroupName $ResourceGroupName -TemplateFile 'template-iam.json' `
     -amsInstances $amsInstances -functionAppIdentityPrincipalId $functionAppIdentityPrincipalId
 
 # Deploy the Event Grid subscriptions.
 Write-Host 'Deploying Event Grid subscriptions.'
-New-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -TemplateFile 'template-eventgrid.json' `
+New-AzResourceGroupDeployment -ResourceGroupName $ResourceGroupName -TemplateFile 'template-eventgrid.json' `
     -amsInstances $amsInstances -functionAppName $functionAppName
 
 # Output the URL to use to create a media encoding job.
