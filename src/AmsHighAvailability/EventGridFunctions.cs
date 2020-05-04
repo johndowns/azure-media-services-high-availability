@@ -11,6 +11,7 @@ using AmsHighAvailability.Models;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using AmsHighAvailability.Telemetry;
 
 namespace AmsHighAvailability
 {
@@ -28,9 +29,11 @@ namespace AmsHighAvailability
                 eventGridEvent.EventType, eventGridEvent.Subject);
             if (eventGridEvent.EventType != "Microsoft.Media.JobStateChange") return;
 
-            var jobTrackerEntityId = GetJobTrackerEntityIdFromEventSubject(eventGridEvent.Subject);
-            var timestamp = eventGridEvent.EventTime;
+            var jobTrackerEntityKey = GetJobTrackerEntityIdFromEventSubject(eventGridEvent.Subject);
+            var entityId = new EntityId(nameof(JobTrackerEntity), jobTrackerEntityKey);
+            TelemetryContext.SetEntityId(entityId);
 
+            var timestamp = eventGridEvent.EventTime;
             var eventData = ((JObject)eventGridEvent.Data).ToObject<JobStateChangeEventData>();
             var state = eventData.State.ToExtendedJobState();
 
@@ -38,10 +41,11 @@ namespace AmsHighAvailability
             // We aren't interested until the job actually starts getting processed.
             if (state == ExtendedJobState.Submitted) return;
 
-            log.LogDebug("Updating job tracker state from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, Stater={State}, Timestamp={Timestamp}",
-                jobTrackerEntityId, state, timestamp);
-            var entityId = new EntityId(nameof(JobTrackerEntity), jobTrackerEntityId);
+            log.LogDebug("Updating job tracker state from Event Grid event. State={State}, Timestamp={Timestamp}",
+                state, timestamp);
             await durableEntityClient.SignalEntityAsync<IJobTrackerEntity>(entityId, proxy => proxy.ReceiveStateUpdate((state, timestamp)));
+
+            TelemetryContext.Reset();
         }
 
         [FunctionName("AmsJobOutputStateUpdate")]
@@ -54,11 +58,13 @@ namespace AmsHighAvailability
                 eventGridEvent.EventType, eventGridEvent.Subject);
             if (eventGridEvent.EventType != "Microsoft.Media.JobOutputStateChange") return;
 
-            var jobTrackerEntityId = GetJobTrackerEntityIdFromEventSubject(eventGridEvent.Subject);
-            var timestamp = eventGridEvent.EventTime;
-
             var eventData = ((JObject)eventGridEvent.Data).ToObject<JobOutputStateChangeEventData>();
             var jobOutputTrackerEntityId = eventData.Output.AssetName;
+            var jobTrackerEntityKey = GetJobTrackerEntityIdFromEventSubject(eventGridEvent.Subject);
+            var entityId = new EntityId(nameof(JobOutputTrackerEntity), jobOutputTrackerEntityId);
+            TelemetryContext.SetEntityId(entityId);
+
+            var timestamp = eventGridEvent.EventTime;
             var jobOutputTrackerProgress = eventData.Output.Progress;
             var state = eventData.Output.State.ToExtendedJobState();
 
@@ -66,10 +72,11 @@ namespace AmsHighAvailability
             // We aren't interested until the job actually starts getting processed.
             if (state == ExtendedJobState.Submitted) return;
 
-            log.LogDebug("Updating job output tracker state from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, State={State}, JobOutputTrackerProgress={JobOutputTrackerProgress}, Timestamp={Timestamp}",
-                jobOutputTrackerEntityId, jobTrackerEntityId, state, jobOutputTrackerProgress, timestamp);
-            var entityId = new EntityId(nameof(JobOutputTrackerEntity), jobOutputTrackerEntityId);
+            log.LogDebug("Updating job output tracker state from Event Grid event. State={State}, JobOutputTrackerProgress={JobOutputTrackerProgress}, Timestamp={Timestamp}",
+                state, jobOutputTrackerProgress, timestamp);
             await durableEntityClient.SignalEntityAsync<IJobOutputTrackerEntity>(entityId, proxy => proxy.ReceiveStateUpdate((state, jobOutputTrackerProgress, timestamp)));
+
+            TelemetryContext.Reset();
         }
 
         private static string GetJobTrackerEntityIdFromEventSubject(string eventSubject)

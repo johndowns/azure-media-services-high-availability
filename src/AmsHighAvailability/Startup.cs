@@ -1,4 +1,6 @@
 ﻿using AmsHighAvailability.Services;
+using AmsHighAvailability.Telemetry;
+using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.Azure.Functions.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +20,7 @@ namespace AmsHighAvailability
             {
                 return new Random();
             });
+            builder.Services.AddSingleton<ITelemetryInitializer, EnrichedTelemetryInitializer>();
             builder.Services.AddScoped<IMediaServicesJobService, MediaServicesJobService>();
 
             builder.Services.AddOptions<Configuration.Options>()

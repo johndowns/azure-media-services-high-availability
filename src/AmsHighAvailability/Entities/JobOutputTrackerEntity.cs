@@ -1,4 +1,5 @@
 ﻿using AmsHighAvailability.Models;
+using AmsHighAvailability.Telemetry;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Extensions.Logging;
@@ -45,13 +46,17 @@ namespace AmsHighAvailability.Entities
         }
 
         [FunctionName(nameof(JobOutputTrackerEntity))]
-        public static Task Run([EntityTrigger] IDurableEntityContext ctx, ILogger log)
-            => ctx.DispatchAsync<JobOutputTrackerEntity>(log);
+        public static async Task Run([EntityTrigger] IDurableEntityContext ctx, ILogger log)
+        {
+            TelemetryContext.SetEntityId(ctx.EntityId);
+            await ctx.DispatchAsync<JobOutputTrackerEntity>(log);
+            TelemetryContext.Reset();
+        }
 
         public void ReceiveStateUpdate((ExtendedJobState state, int progress, DateTimeOffset timestamp) arguments)
         {
-            _log.LogInformation("Received state update for job output tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Timestamp={Timestamp}, JobOutputTrackerState={JobOutputTrackerState}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
-                JobCoordinatorEntityId, JobTrackerEntityId, JobOutputTrackerEntityId, arguments.timestamp, arguments.state, arguments.progress);
+            _log.LogInformation("Received state update for job output tracker. Timestamp={Timestamp}, JobOutputTrackerState={JobOutputTrackerState}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
+                arguments.timestamp, arguments.state, arguments.progress);
             StateHistory.Add(new JobOutputTrackerStateHistory { Timestamp = arguments.timestamp, Progress = arguments.progress, TimeReceived = DateTimeOffset.Now });
 
             // If we see the state move from 'Received' to something else, or from 'Processing'
@@ -69,8 +74,7 @@ namespace AmsHighAvailability.Entities
                     LastTimeSeenJobOutputProgress = arguments.timestamp;
 
                     // Signal the tracker that we have seen a progress update.
-                    _log.LogDebug("Updating job tracker state from output tracker's state change. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Timestamp={Timestamp}, JobOutputTrackerState={JobOutputTrackerState}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
-                        JobCoordinatorEntityId, JobTrackerEntityId, JobOutputTrackerEntityId, arguments.timestamp, arguments.state, arguments.progress);
+                    _log.LogDebug("Updating job tracker state from output tracker's state change.");
                     var entityId = new EntityId(nameof(JobTrackerEntity), JobTrackerEntityId);
                     Entity.Current.SignalEntity<IJobTrackerEntity>(
                         entityId,

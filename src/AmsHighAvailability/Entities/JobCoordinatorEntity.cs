@@ -1,4 +1,5 @@
 ﻿using AmsHighAvailability.Models;
+using AmsHighAvailability.Telemetry;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Extensions.Logging;
@@ -63,23 +64,25 @@ namespace AmsHighAvailability.Entities
         }
 
         [FunctionName(nameof(JobCoordinatorEntity))]
-        public static Task Run([EntityTrigger] IDurableEntityContext ctx, ILogger log)
-            => ctx.DispatchAsync<JobCoordinatorEntity>(log);
+        public static async Task Run([EntityTrigger] IDurableEntityContext ctx, ILogger log)
+        {
+            TelemetryContext.SetEntityId(ctx.EntityId);
+            await ctx.DispatchAsync<JobCoordinatorEntity>(log);
+            TelemetryContext.Reset();
+        }
 
         public void Start(string inputMediaFileUrl)
         {
             // Initialise the coordinator.
             InputMediaFileUrl = inputMediaFileUrl;
-            _log.LogInformation("Started job coordinator. JobCoordinatorEntityId={JobCoordinatorEntityId}, InputMediaFileUrl={InputMediaFileUrl}",
-                JobCoordinatorEntityId, InputMediaFileUrl);
+            _log.LogInformation("Started job coordinator.");
             State = ExtendedJobState.Submitted;
 
             // Start a new tracker.
             var trackerStarted = StartTracker();
             if (!trackerStarted)
             {
-                _log.LogError("Could not start job tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}, InputMediaFileUrl={InputMediaFileUrl}",
-                    JobCoordinatorEntityId, InputMediaFileUrl);
+                _log.LogError("Could not start job tracker.");
                 State = ExtendedJobState.Failed;
                 return;
             }
@@ -89,8 +92,8 @@ namespace AmsHighAvailability.Entities
 
         public void MarkTrackerAsSucceeded((string jobTrackerEntityId, IEnumerable<AmsAsset> assets) arguments)
         {
-            _log.LogInformation("Job tracker has succeeded; marking job coordinator as succeeded. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={jobTrackerEntityId}",
-                JobCoordinatorEntityId, arguments.jobTrackerEntityId);
+            _log.LogInformation("Job tracker has succeeded; marking job coordinator as succeeded. JobTrackerEntityId={jobTrackerEntityId}",
+                arguments.jobTrackerEntityId);
             State = ExtendedJobState.Succeeded;
 
             // Keep a note of the tracker that succeeded with the job, so that the user can find the associated outputs.
@@ -103,15 +106,14 @@ namespace AmsHighAvailability.Entities
 
         public void MarkTrackerAsFailed((string jobTrackerEntityId, ExtendedJobState jobState) arguments)
         {
-            _log.LogInformation("Job tracker has failed. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobState={JobState}",
-                JobCoordinatorEntityId, arguments.jobTrackerEntityId, arguments.jobState);
+            _log.LogInformation("Job tracker has failed. JobTrackerEntityId={JobTrackerEntityId}, JobState={JobState}",
+                arguments.jobTrackerEntityId, arguments.jobState);
 
             // Try to restart the job, and if it doesn't work, we consider the whole job to have failed.
             var newTrackerStarted = StartTracker();
             if (!newTrackerStarted)
             {
-                _log.LogError("Unable to start a new tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}",
-                    JobCoordinatorEntityId);
+                _log.LogError("Unable to start a new tracker.");
                 State = ExtendedJobState.Failed;
             }
         }
@@ -121,8 +123,7 @@ namespace AmsHighAvailability.Entities
             var amsInstanceId = SelectAmsInstanceId();
             if (amsInstanceId == null)
             {
-                _log.LogWarning("Cannot start any further trackers since no AMS instances are left to use. JobCoordinatorEntityId={JobCoordinatorEntityId}",
-                    JobCoordinatorEntityId);
+                _log.LogWarning("Cannot start any further trackers since no AMS instances are left to use.");
                 return false;
             }
 
@@ -133,8 +134,8 @@ namespace AmsHighAvailability.Entities
             Entity.Current.SignalEntity<IJobTrackerEntity>(
                 trackerEntityId,
                 proxy => proxy.Start((InputMediaFileUrl, amsInstanceId)));
-            _log.LogDebug("Requested tracked job to start. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, AmsInstanceId={AmsInstanceId}",
-                JobCoordinatorEntityId, trackerId, amsInstanceId);
+            _log.LogDebug("Requested tracked job to start. JobTrackerEntityId={JobTrackerEntityId}, AmsInstanceId={AmsInstanceId}",
+                trackerId, amsInstanceId);
             return true;
         }
 

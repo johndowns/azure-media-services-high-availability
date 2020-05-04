@@ -10,6 +10,7 @@ using AmsHighAvailability.Entities;
 using System.Web.Http;
 using System.Collections.Generic;
 using AmsHighAvailability.Models;
+using AmsHighAvailability.Telemetry;
 
 namespace AmsHighAvailability
 {
@@ -30,11 +31,15 @@ namespace AmsHighAvailability
             // Start the job by signalling the entity.
             var jobCoordinatorId = Guid.NewGuid().ToString();
             var entityId = new EntityId(nameof(JobCoordinatorEntity), jobCoordinatorId);
+            TelemetryContext.SetEntityId(entityId);
             await durableEntityClient.SignalEntityAsync<IJobCoordinatorEntity>(entityId, proxy => proxy.Start(jobRequest.MediaFileUrl));
 
-            log.LogDebug("Initiated job coordinator. JobCoordinatorEntityId={JobCoordinatorEntityId}", jobCoordinatorId);
+            log.LogDebug("Initiated job coordinator.");
 
             var jobCoordinatorLocation = $"{req.Scheme}://{req.Host}/api/jobCoordinators/{jobCoordinatorId}";
+
+            TelemetryContext.Reset();
+
             return new AcceptedResult(jobCoordinatorLocation, null);
         }
 
@@ -47,6 +52,7 @@ namespace AmsHighAvailability
             ILogger log)
         {
             var entityId = new EntityId(nameof(JobCoordinatorEntity), jobCoordinatorId);
+            TelemetryContext.SetEntityId(entityId);
             var entityState = await durableEntityClient.ReadEntityStateAsync<JobCoordinatorEntity>(entityId);
             
             if (!entityState.EntityExists)
@@ -68,6 +74,8 @@ namespace AmsHighAvailability
                     Assets = entityState.EntityState.CompletedJob.Assets
                 };
             }
+
+            TelemetryContext.Reset();
 
             return new OkObjectResult(response);
         }
