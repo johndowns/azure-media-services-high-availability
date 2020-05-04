@@ -87,9 +87,9 @@ namespace AmsHighAvailability.Entities
 
         private void UpdateState(ExtendedJobState state)
         {
-            State = state;
-            _log.LogInformation("Job coordinator has a state update. JobCoordinatorEntityId={JobCoordinatorEntityId}, State={State}",
+            _log.LogDebug("Job coordinator has a state update. JobCoordinatorEntityId={JobCoordinatorEntityId}, State={State}",
                 JobCoordinatorEntityId, State);
+            State = state;
         }
 
         public void MarkTrackerAsSucceeded((string jobTrackerEntityId, IEnumerable<AmsAsset> assets) arguments)
