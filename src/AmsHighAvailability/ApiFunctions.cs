@@ -17,7 +17,7 @@ namespace AmsHighAvailability
     {
         [FunctionName("CreateJobCoordinator")]
         public async Task<IActionResult> CreateJobCoordinator(
-            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "jobCoordinators")] CreateJobCoordinatorRequest jobRequest, // TODO potentially change from /jobs to /jobCoordinators?
+            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "jobCoordinators")] CreateJobCoordinatorRequest jobRequest,
             HttpRequest req,
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
@@ -34,8 +34,8 @@ namespace AmsHighAvailability
 
             log.LogDebug("Initiated job coordinator. JobCoordinatorEntityId={JobCoordinatorEntityId}", jobCoordinatorId);
 
-            var checkStatusLocation = $"{req.Scheme}://{req.Host}/api/jobCoordinators/{jobCoordinatorId}";
-            return new AcceptedResult(checkStatusLocation, null);
+            var jobCoordinatorLocation = $"{req.Scheme}://{req.Host}/api/jobCoordinators/{jobCoordinatorId}";
+            return new AcceptedResult(jobCoordinatorLocation, null);
         }
 
         [FunctionName("GetJobCoordinator")]
@@ -56,11 +56,11 @@ namespace AmsHighAvailability
 
             var response = new JobCoordinatorStateResponse
             {
-                JobState = entityState.EntityState.Status.ToString(),
+                JobState = entityState.EntityState.State.ToString(),
                 MediaFileUrl = entityState.EntityState.InputMediaFileUrl
             };
 
-            if (entityState.EntityState.Status == ExtendedJobState.Succeeded)
+            if (entityState.EntityState.State == ExtendedJobState.Succeeded)
             {
                 response.Outputs = new JobOutputsResponse
                 {

@@ -11,7 +11,7 @@ namespace AmsHighAvailability.Entities
 {
     public interface IJobOutputTrackerEntity
     {
-        void ReceiveStatusUpdate((ExtendedJobState newStatus, int progress, DateTimeOffset statusTime) arguments);
+        void ReceiveStateUpdate((ExtendedJobState state, int progress, DateTimeOffset timestamp) arguments);
     }
 
     public class JobOutputTrackerEntity : IJobOutputTrackerEntity
@@ -25,13 +25,13 @@ namespace AmsHighAvailability.Entities
         [JsonProperty("jobOutputTrackerEntityId")]
         public string JobOutputTrackerEntityId => Entity.Current.EntityKey;
 
-        [JsonProperty("status")]
-        public ExtendedJobState CurrentStatus { get; set; } = ExtendedJobState.Submitted;
+        [JsonProperty("state")]
+        public ExtendedJobState State { get; set; } = ExtendedJobState.Submitted;
 
         [JsonProperty("currentProgress")]
         public int CurrentProgress { get; set; } = 0;
 
-        public HashSet<JobOutputTrackerStatusHistory> StatusHistory { get; set; } = new HashSet<JobOutputTrackerStatusHistory>(); // TODO rename Status -> State
+        public HashSet<JobOutputTrackerStateHistory> StateHistory { get; set; } = new HashSet<JobOutputTrackerStateHistory>();
 
         [JsonProperty("LastTimeSeenJobOutputProgress")]
         public DateTimeOffset? LastTimeSeenJobOutputProgress { get; set; } = null;
@@ -48,33 +48,33 @@ namespace AmsHighAvailability.Entities
         public static Task Run([EntityTrigger] IDurableEntityContext ctx, ILogger log)
             => ctx.DispatchAsync<JobOutputTrackerEntity>(log);
 
-        public void ReceiveStatusUpdate((ExtendedJobState newStatus, int progress, DateTimeOffset statusTime) arguments)
+        public void ReceiveStateUpdate((ExtendedJobState state, int progress, DateTimeOffset timestamp) arguments)
         {
-            _log.LogInformation("Received state update for job output tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Time={StatusTime}, JobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
-                JobCoordinatorEntityId, JobTrackerEntityId, JobOutputTrackerEntityId, arguments.statusTime, arguments.newStatus, arguments.progress);
-            StatusHistory.Add(new JobOutputTrackerStatusHistory { StatusTime = arguments.statusTime, Progress = arguments.progress, TimeReceived = DateTimeOffset.Now });
+            _log.LogInformation("Received state update for job output tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Timestamp={Timestamp}, JobOutputTrackerState={JobOutputTrackerState}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
+                JobCoordinatorEntityId, JobTrackerEntityId, JobOutputTrackerEntityId, arguments.timestamp, arguments.state, arguments.progress);
+            StateHistory.Add(new JobOutputTrackerStateHistory { Timestamp = arguments.timestamp, Progress = arguments.progress, TimeReceived = DateTimeOffset.Now });
 
-            // If we see the status move from 'Received' to something else, or from 'Processing'
+            // If we see the state move from 'Received' to something else, or from 'Processing'
             // to something else, or we see the progress increase, then we count this as progress.
-            if ((CurrentStatus == ExtendedJobState.Submitted && arguments.newStatus != ExtendedJobState.Submitted) ||
-                (CurrentStatus == ExtendedJobState.Processing && arguments.newStatus != ExtendedJobState.Processing) ||
+            if ((State == ExtendedJobState.Submitted && arguments.state != ExtendedJobState.Submitted) ||
+                (State == ExtendedJobState.Processing && arguments.state != ExtendedJobState.Processing) ||
                 (arguments.progress > CurrentProgress))
             {
                 if (LastTimeSeenJobOutputProgress == null ||
-                    arguments.statusTime > LastTimeSeenJobOutputProgress)
+                    arguments.timestamp > LastTimeSeenJobOutputProgress)
                 {
-                    // Update the current status information.
-                    CurrentStatus = arguments.newStatus;
+                    // Update the current state information.
+                    State = arguments.state;
                     CurrentProgress = arguments.progress;
-                    LastTimeSeenJobOutputProgress = arguments.statusTime;
+                    LastTimeSeenJobOutputProgress = arguments.timestamp;
 
                     // Signal the tracker that we have seen a progress update.
-                    _log.LogDebug("Updating job tracker status from output tracker's status change. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Time={StatusTime}, JobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
-                        JobCoordinatorEntityId, JobTrackerEntityId, JobOutputTrackerEntityId, arguments.statusTime, arguments.newStatus, arguments.progress);
+                    _log.LogDebug("Updating job tracker state from output tracker's state change. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, Timestamp={Timestamp}, JobOutputTrackerState={JobOutputTrackerState}, JobOutputTrackerProgress={JobOutputTrackerProgress}",
+                        JobCoordinatorEntityId, JobTrackerEntityId, JobOutputTrackerEntityId, arguments.timestamp, arguments.state, arguments.progress);
                     var entityId = new EntityId(nameof(JobTrackerEntity), JobTrackerEntityId);
                     Entity.Current.SignalEntity<IJobTrackerEntity>(
                         entityId,
-                        proxy => proxy.ReceiveOutputStatusUpdate(arguments.statusTime));
+                        proxy => proxy.ReceiveOutputStateUpdate(arguments.timestamp));
                 }
             }
         }

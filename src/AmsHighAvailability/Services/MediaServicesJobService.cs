@@ -21,7 +21,7 @@ namespace AmsHighAvailability.Services
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
             string assetName);
 
-        Task<AmsJobCurrentState> GetJobStatus(
+        Task<AmsJobCurrentState> GetJobState(
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
             string jobName);
     }
@@ -97,7 +97,7 @@ namespace AmsHighAvailability.Services
             return (asset.StorageAccountName, asset.Container);
         }
 
-        public async Task<AmsJobCurrentState> GetJobStatus(
+        public async Task<AmsJobCurrentState> GetJobState(
             string subscriptionId, string resourceGroupName, string mediaServicesInstanceName,
             string jobName)
         {

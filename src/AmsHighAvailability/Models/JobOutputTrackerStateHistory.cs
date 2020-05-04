@@ -2,10 +2,10 @@
 
 namespace AmsHighAvailability.Models
 {
-    public class JobOutputTrackerStatusHistory
+    public class JobOutputTrackerStateHistory
     {
-        public DateTimeOffset StatusTime { get; set; }
-        public ExtendedJobState Status { get; set; }
+        public DateTimeOffset Timestamp { get; set; }
+        public ExtendedJobState State { get; set; }
         public int Progress { get; set; }
         public DateTimeOffset TimeReceived { get; set; }
     }

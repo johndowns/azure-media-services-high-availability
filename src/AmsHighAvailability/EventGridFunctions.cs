@@ -24,24 +24,24 @@ namespace AmsHighAvailability
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
         {
-            log.LogDebug("Received job status Event Grid event of type {EventGridEventType} for subject {EventGridEventSubject}.",
+            log.LogDebug("Received job tracker Event Grid event of type {EventGridEventType} for subject {EventGridEventSubject}.",
                 eventGridEvent.EventType, eventGridEvent.Subject);
             if (eventGridEvent.EventType != "Microsoft.Media.JobStateChange") return;
 
             var jobTrackerEntityId = GetJobTrackerEntityIdFromEventSubject(eventGridEvent.Subject);
-            var statusTime = eventGridEvent.EventTime;
+            var timestamp = eventGridEvent.EventTime;
 
             var eventData = ((JObject)eventGridEvent.Data).ToObject<JobStateChangeEventData>();
-            var jobTrackerStatus = eventData.State.ToExtendedJobState();
+            var state = eventData.State.ToExtendedJobState();
 
-            // We don't need to listen for status messages where the job has been queued or scheduled.
+            // We don't need to listen for update messages if the job is in the 'queued' or 'scheduled' state.
             // We aren't interested until the job actually starts getting processed.
-            if (jobTrackerStatus == ExtendedJobState.Submitted) return;
+            if (state == ExtendedJobState.Submitted) return;
 
-            log.LogDebug("Updating job tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobTrackerStatus={JobTrackerStatus}, StatusTime={StatusTime}",
-                jobTrackerEntityId, jobTrackerStatus, statusTime);
+            log.LogDebug("Updating job tracker state from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, Stater={State}, Timestamp={Timestamp}",
+                jobTrackerEntityId, state, timestamp);
             var entityId = new EntityId(nameof(JobTrackerEntity), jobTrackerEntityId);
-            await durableEntityClient.SignalEntityAsync<IJobTrackerEntity>(entityId, proxy => proxy.ReceiveStatusUpdate((jobTrackerStatus, statusTime)));
+            await durableEntityClient.SignalEntityAsync<IJobTrackerEntity>(entityId, proxy => proxy.ReceiveStateUpdate((state, timestamp)));
         }
 
         [FunctionName("AmsJobOutputStatusUpdate")]
@@ -50,26 +50,26 @@ namespace AmsHighAvailability
             [DurableClient]IDurableEntityClient durableEntityClient,
             ILogger log)
         {
-            log.LogDebug("Received job output status Event Grid event of type {EventGridEventType} for subject {EventGridEventSubject}.",
+            log.LogDebug("Received job output tracker Event Grid event of type {EventGridEventType} for subject {EventGridEventSubject}.",
                 eventGridEvent.EventType, eventGridEvent.Subject);
             if (eventGridEvent.EventType != "Microsoft.Media.JobOutputStateChange") return;
 
             var jobTrackerEntityId = GetJobTrackerEntityIdFromEventSubject(eventGridEvent.Subject);
-            var statusTime = eventGridEvent.EventTime;
+            var timestamp = eventGridEvent.EventTime;
 
             var eventData = ((JObject)eventGridEvent.Data).ToObject<JobOutputStateChangeEventData>();
             var jobOutputTrackerEntityId = eventData.Output.AssetName;
             var jobOutputTrackerProgress = eventData.Output.Progress;
-            var jobOutputTrackerStatus = eventData.Output.State.ToExtendedJobState();
+            var state = eventData.Output.State.ToExtendedJobState();
 
-            // We don't need to listen for status messages where the job has been queued or scheduled.
+            // We don't need to listen for update messages if the job output is in the 'queued' or 'scheduled' state.
             // We aren't interested until the job actually starts getting processed.
-            if (jobOutputTrackerStatus == ExtendedJobState.Submitted) return;
+            if (state == ExtendedJobState.Submitted) return;
 
-            log.LogDebug("Updating job output tracker status from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, jobOutputTrackerStatus={JobOutputTrackerStatus}, JobOutputTrackerProgress={JobOutputTrackerProgress}, StatusTime={StatusTime}",
-                jobOutputTrackerEntityId, jobTrackerEntityId, jobOutputTrackerStatus, jobOutputTrackerProgress, statusTime);
+            log.LogDebug("Updating job output tracker state from Event Grid event. JobTrackerEntityId={JobTrackerEntityId}, JobOutputTrackerEntityId={JobOutputTrackerEntityId}, State={State}, JobOutputTrackerProgress={JobOutputTrackerProgress}, Timestamp={Timestamp}",
+                jobOutputTrackerEntityId, jobTrackerEntityId, state, jobOutputTrackerProgress, timestamp);
             var entityId = new EntityId(nameof(JobOutputTrackerEntity), jobOutputTrackerEntityId);
-            await durableEntityClient.SignalEntityAsync<IJobOutputTrackerEntity>(entityId, proxy => proxy.ReceiveStatusUpdate((jobOutputTrackerStatus, jobOutputTrackerProgress, statusTime)));
+            await durableEntityClient.SignalEntityAsync<IJobOutputTrackerEntity>(entityId, proxy => proxy.ReceiveStateUpdate((state, jobOutputTrackerProgress, timestamp)));
         }
 
         private static string GetJobTrackerEntityIdFromEventSubject(string eventSubject)
