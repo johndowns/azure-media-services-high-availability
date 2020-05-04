@@ -78,25 +78,20 @@ namespace AmsHighAvailability.Entities
             var trackerStarted = StartTracker();
             if (!trackerStarted)
             {
-                UpdateState(ExtendedJobState.Failed);
+                _log.LogError("Could not start job tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}, InputMediaFileUrl={InputMediaFileUrl}",
+                    JobCoordinatorEntityId, InputMediaFileUrl);
+                State = ExtendedJobState.Failed;
                 return;
             }
 
             State = ExtendedJobState.Processing;
         }
 
-        private void UpdateState(ExtendedJobState state)
-        {
-            _log.LogDebug("Job coordinator has a state update. JobCoordinatorEntityId={JobCoordinatorEntityId}, State={State}",
-                JobCoordinatorEntityId, State);
-            State = state;
-        }
-
         public void MarkTrackerAsSucceeded((string jobTrackerEntityId, IEnumerable<AmsAsset> assets) arguments)
         {
             _log.LogInformation("Job tracker has succeeded; marking job coordinator as succeeded. JobCoordinatorEntityId={JobCoordinatorEntityId}, JobTrackerEntityId={jobTrackerEntityId}",
                 JobCoordinatorEntityId, arguments.jobTrackerEntityId);
-            UpdateState(ExtendedJobState.Succeeded);
+            State = ExtendedJobState.Succeeded;
 
             // Keep a note of the tracker that succeeded with the job, so that the user can find the associated outputs.
             CompletedJob = new CompletedJob
@@ -117,7 +112,7 @@ namespace AmsHighAvailability.Entities
             {
                 _log.LogError("Unable to start a new tracker. JobCoordinatorEntityId={JobCoordinatorEntityId}",
                     JobCoordinatorEntityId);
-                UpdateState(ExtendedJobState.Failed);
+                State = ExtendedJobState.Failed;
             }
         }
 
